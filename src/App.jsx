@@ -280,6 +280,10 @@ export default function App() {
   const [yahooAuctionKeyword, setYahooAuctionKeyword] = useState("");
   const [yahooAuctionResults, setYahooAuctionResults] = useState([]);
   const [yahooAuctionLog, setYahooAuctionLog] = useState("");
+  const [myListings, setMyListings] = useState([]);
+  const [listingsLog, setListingsLog] = useState("");
+  const [listingsLoading, setListingsLoading] = useState(false);
+  const [replaceList, setReplaceList] = useState([]);
 
   const hasRakutenKey = !!YAHOO_CLIENT_ID;
   const hasEbayKey = !!EBAY_APP_ID;
@@ -475,7 +479,7 @@ export default function App() {
     { phase: 1, label: "Yahoo仕入れ", icon: "🟢", active: true },
     { phase: 2, label: "eBay売れ筋", icon: hasEbayKey ? "🟢" : "🟡", active: true },
     { phase: 3, label: "ヤフオク仕入れ", icon: hasRakutenKey ? "🟢" : "🟡", active: true },
-    { phase: 4, label: "Shopee連携", icon: "⏳", active: false },
+    { phase: 4, label: "回転管理", icon: "🔄", active: true },
   ];
 
   return (
@@ -869,6 +873,195 @@ export default function App() {
             )}
           </>
         )}
+        {/* PHASE 4: 回転管理 */}
+        {activePhase === 4 && (
+          <>
+            <div style={{
+              background: "#ffffff", border: "1px solid #e2e8f0",
+              borderRadius: 16, padding: 24, marginBottom: 24,
+              boxShadow: "0 1px 4px #0000000a",
+            }}>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 6 }}>
+                  🔄 eBay出品回転管理
+                </div>
+                <div style={{ fontSize: 12, color: "#64748b" }}>
+                  出品中の商品を一覧表示。売れていない商品（30日以上）を検出して入れ替え候補に追加できます。
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <button
+                  onClick={async () => {
+                    setListingsLoading(true);
+                    setListingsLog("🔍 eBay出品一覧を取得中...");
+                    try {
+                      const res = await fetch("/api/ebay-listings");
+                      const data = await res.json();
+                      if (data.error) {
+                        setListingsLog(`❌ エラー: ${data.error}`);
+                      } else {
+                        setMyListings(data.items || []);
+                        setListingsLog(`✅ ${data.total}件の出品中商品を取得 — 長期出品順に表示`);
+                      }
+                    } catch (e) {
+                      setListingsLog(`❌ ${e.message}`);
+                    }
+                    setListingsLoading(false);
+                  }}
+                  disabled={listingsLoading}
+                  style={{
+                    padding: "11px 28px",
+                    background: listingsLoading ? "#cbd5e1" : "linear-gradient(135deg, #10b981, #0d9488)",
+                    border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
+                    cursor: listingsLoading ? "not-allowed" : "pointer", fontSize: 14,
+                  }}
+                >
+                  {listingsLoading ? "🔄 取得中..." : "📋 出品一覧を取得"}
+                </button>
+                {replaceList.length > 0 && (
+                  <div style={{
+                    background: "#fef3c7", border: "1px solid #fcd34d",
+                    borderRadius: 8, padding: "8px 16px", fontSize: 12, color: "#92400e",
+                  }}>
+                    ⚠ 入れ替え候補 {replaceList.length}件
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {listingsLog && (
+              <div style={{
+                background: "#f1f5f9", border: "1px solid #e2e8f0",
+                borderRadius: 8, padding: "10px 16px", marginBottom: 16,
+                color: "#475569", fontSize: 12, fontFamily: "'DM Mono', monospace",
+              }}>
+                {listingsLog}
+              </div>
+            )}
+
+            {replaceList.length > 0 && (
+              <div style={{
+                background: "#fff7ed", border: "1px solid #fed7aa",
+                borderRadius: 12, padding: 16, marginBottom: 16,
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: "#92400e", marginBottom: 10 }}>
+                  ⚠ 入れ替え候補（{replaceList.length}件）— 売れ行き不振
+                </div>
+                {replaceList.map((item, i) => (
+                  <div key={i} style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    background: "#ffffff", borderRadius: 8, padding: "8px 12px",
+                    marginBottom: 6, border: "1px solid #fed7aa", fontSize: 12,
+                  }}>
+                    <div style={{ flex: 1, color: "#1e293b" }}>{item.title}</div>
+                    <div style={{ color: "#ef4444", fontWeight: 700, marginLeft: 12 }}>{item.daysListed}日出品中</div>
+                    {item.viewUrl && (
+                      <a href={item.viewUrl} target="_blank" rel="noreferrer" style={{
+                        marginLeft: 12, color: "#E53238", fontSize: 11, textDecoration: "none",
+                      }}>eBayで見る →</a>
+                    )}
+                    <button
+                      onClick={() => setReplaceList(r => r.filter((_, j) => j !== i))}
+                      style={{
+                        marginLeft: 8, background: "none", border: "none",
+                        color: "#94a3b8", cursor: "pointer", fontSize: 14,
+                      }}
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {myListings.length > 0 && (
+              <div>
+                <div style={{ color: "#64748b", fontSize: 12, fontFamily: "'DM Mono', monospace", marginBottom: 14 }}>
+                  {myListings.length} ITEMS — 長期出品順（要入れ替え検出）
+                </div>
+                {myListings.map((item, i) => {
+                  const isStale = item.daysListed >= 30;
+                  const inReplaceList = replaceList.some(r => r.itemId === item.itemId);
+                  return (
+                    <div key={i} style={{
+                      background: "#ffffff",
+                      border: `1px solid ${isStale ? "#fed7aa" : "#e2e8f0"}`,
+                      borderRadius: 12, marginBottom: 10, padding: "14px 16px",
+                      boxShadow: "0 1px 3px #0000000a",
+                      display: "grid", gridTemplateColumns: "32px 60px 1fr auto auto auto auto",
+                      gap: 12, alignItems: "center",
+                    }}>
+                      <span style={{ color: "#cbd5e1", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt="" style={{ width: 52, height: 52, objectFit: "contain", borderRadius: 6 }} />
+                      ) : (
+                        <div style={{ width: 52, height: 52, background: "#f0fdf4", borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>📦</div>
+                      )}
+                      <div>
+                        <div style={{ color: "#1e293b", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
+                          {item.title}
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {isStale && <Tag label={`⚠ ${item.daysListed}日出品中`} color="#f59e0b" />}
+                          {!isStale && <Tag label={`${item.daysListed}日`} color="#10b981" />}
+                          {item.watchCount > 0 && <Tag label={`👁 ${item.watchCount}件ウォッチ`} color="#6366f1" />}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ color: "#10b981", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
+                          ${item.price?.toFixed(2)}
+                        </div>
+                        <div style={{ color: "#94a3b8", fontSize: 11 }}>出品価格</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ color: "#6366f1", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
+                          {item.hitCount || 0}
+                        </div>
+                        <div style={{ color: "#94a3b8", fontSize: 11 }}>ページビュー</div>
+                      </div>
+                      {item.viewUrl && (
+                        <a href={item.viewUrl} target="_blank" rel="noreferrer" style={{
+                          background: "#E5323811", border: "1px solid #E5323833",
+                          borderRadius: 6, padding: "6px 10px", color: "#E53238",
+                          textDecoration: "none", fontSize: 11, whiteSpace: "nowrap",
+                        }}>eBayで見る</a>
+                      )}
+                      <button
+                        onClick={() => {
+                          if (inReplaceList) {
+                            setReplaceList(r => r.filter(x => x.itemId !== item.itemId));
+                          } else {
+                            setReplaceList(r => [...r, item]);
+                          }
+                        }}
+                        style={{
+                          background: inReplaceList ? "#fef3c7" : isStale ? "#fff7ed" : "#f8fafc",
+                          border: `1px solid ${inReplaceList ? "#fcd34d" : isStale ? "#fed7aa" : "#e2e8f0"}`,
+                          borderRadius: 6, padding: "6px 10px",
+                          color: inReplaceList ? "#92400e" : isStale ? "#d97706" : "#94a3b8",
+                          cursor: "pointer", fontSize: 11, whiteSpace: "nowrap",
+                        }}
+                      >
+                        {inReplaceList ? "✓ 候補済み" : "入れ替え候補"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {myListings.length === 0 && !listingsLoading && (
+              <div style={{ textAlign: "center", padding: "60px 0", color: "#cbd5e1" }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🔄</div>
+                <div style={{ fontSize: 14, color: "#94a3b8" }}>「出品一覧を取得」ボタンでeBayの出品商品を表示</div>
+                <div style={{ fontSize: 12, marginTop: 8, color: "#cbd5e1" }}>
+                  30日以上売れていない商品を検出 → 入れ替え候補に追加
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
       </div>
     </div>
   );
