@@ -276,6 +276,7 @@ export default function App() {
   const [ebayResults, setEbayResults] = useState([]);
   const [log, setLog] = useState("");
   const [ebayLog, setEbayLog] = useState("");
+  const [minProfitRate, setMinProfitRate] = useState(0);
   const [yahooAuctionKeyword, setYahooAuctionKeyword] = useState("");
   const [yahooAuctionResults, setYahooAuctionResults] = useState([]);
   const [yahooAuctionLog, setYahooAuctionLog] = useState("");
@@ -301,7 +302,7 @@ export default function App() {
       const params = new URLSearchParams({
         appid: YAHOO_CLIENT_ID,
         query: keyword,
-        results: "20",
+        results: "100",
         sort: "-sold",
         output: "json",
       });
@@ -462,11 +463,13 @@ export default function App() {
     setLoading(false);
   }
 
-  const sortedResults = [...results].sort((a, b) => {
-    const ra = calcProfit(a.buyPrice, a.sellPrice).profitRate;
-    const rb = calcProfit(b.buyPrice, b.sellPrice).profitRate;
-    return rb - ra;
-  });
+  const sortedResults = [...results]
+    .sort((a, b) => {
+      const ra = calcProfit(a.buyPrice, a.sellPrice).profitRate;
+      const rb = calcProfit(b.buyPrice, b.sellPrice).profitRate;
+      return rb - ra;
+    })
+    .filter(item => calcProfit(item.buyPrice, item.sellPrice).profitRate >= minProfitRate);
 
   const phases = [
     { phase: 1, label: "Yahoo仕入れ", icon: "🟢", active: true },
@@ -584,7 +587,7 @@ export default function App() {
                 </div>
               </div>
               <div style={{
-                display: "flex", gap: 16, flexWrap: "wrap",
+                display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center",
                 background: "#e2e8f0", borderRadius: 8, padding: "10px 14px",
                 fontSize: 11, color: "#64748b", fontFamily: "'DM Mono', monospace",
               }}>
@@ -592,7 +595,20 @@ export default function App() {
                 <span>📦 国際送料：${SHIPPING_USD}</span>
                 <span>💳 eBay手数料：{(EBAY_FEE_RATE * 100)}%＋${EBAY_FEE_FIXED}</span>
                 <span>📈 想定マークアップ：2.2倍＋送料</span>
-                {!hasRakutenKey && <span style={{ color: "#d97706" }}>⚠ Yahoo!APIキー未設定 — デモ表示中</span>}
+                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+                  🎯 利益率フィルター：
+                  <select
+                    value={minProfitRate}
+                    onChange={e => setMinProfitRate(Number(e.target.value))}
+                    style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, border: "1px solid #cbd5e1" }}
+                  >
+                    <option value={0}>全て表示</option>
+                    <option value={20}>20%以上</option>
+                    <option value={30}>30%以上</option>
+                    <option value={40}>40%以上</option>
+                    <option value={50}>50%以上</option>
+                  </select>
+                </span>
               </div>
             </div>
 

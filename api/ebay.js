@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     const query = req.query;
     const keyword = query.keywords || "";
     const searchRes = await fetch(
-      `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(keyword)}&filter=buyingOptions%3A%7BFIXED_PRICE%7D&sort=BEST_MATCH&limit=20`,
+      `https://api.ebay.com/buy/browse/v1/item_summary/search?q=${encodeURIComponent(keyword)}&filter=buyingOptions%3A%7BFIXED_PRICE%7D&sort=BEST_MATCH&limit=100`,
       {
         headers: {
           "Authorization": `Bearer ${tokenData.access_token}`,
