@@ -1,17 +1,14 @@
 export default async function handler(req, res) {
-  const params = new URLSearchParams(req.query);
-  params.set("RESPONSE-DATA-FORMAT", "JSON");
-  const url = `https://svcs.ebay.com/services/search/FindingService/v1?${params}`;
+  const query = req.url.split("?")[1] || "";
+  const url = `https://svcs.ebay.com/services/search/FindingService/v1?${query}`;
   try {
-    const response = await fetch(url, {
-      headers: { "Accept": "application/json" },
-    });
+    const response = await fetch(url);
     const text = await response.text();
     try {
       const data = JSON.parse(text);
       res.status(response.status).json(data);
     } catch {
-      res.status(500).json({ error: "eBay API parse error", raw: text.slice(0, 200) });
+      res.status(500).json({ error: "parse error", raw: text.slice(0, 500) });
     }
   } catch (e) {
     res.status(500).json({ error: e.message });
