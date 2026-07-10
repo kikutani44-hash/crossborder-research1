@@ -306,7 +306,7 @@ export default function App() {
         output: "json",
       });
 
-      const res = await fetch(`/api/yahoo/ShoppingWebService/V3/itemSearch?${params}`);
+      const res = await fetch(`/api/yahoo?${params}`);
       if (!res.ok) {
         await new Promise(r => setTimeout(r, 800));
         setResults(DEMO_RESULTS);
@@ -367,7 +367,7 @@ export default function App() {
         "paginationInput.entriesPerPage": "20",
       });
 
-      const res = await fetch(`/api/ebay/services/search/FindingService/v1?${params}`);
+      const res = await fetch(`/api/ebay?${params}`);
       if (!res.ok) {
         setEbayResults(DEMO_EBAY_RESULTS);
         setEbayLog(`⚠ eBay API接続エラー（${res.status}）— デモデータを表示しています`);
@@ -425,7 +425,7 @@ export default function App() {
         output: "json",
       });
 
-      const res = await fetch(`/api/yahooauction/AuctionWebService/V2/json/search?${params}`);
+      const res = await fetch(`/api/yahooauction?${params}`);
       if (!res.ok) {
         setYahooAuctionResults(DEMO_AUCTION);
         setYahooAuctionLog(`⚠ ヤフオクAPI接続エラー（${res.status}）— デモデータを表示しています`);
