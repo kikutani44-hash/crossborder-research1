@@ -31,6 +31,26 @@ function estimateSellPrice(buyPriceJpy) {
   return Math.round((baseUsd * 2.2 + SHIPPING_USD) * 100) / 100;
 }
 
+function extractYahooItemCode(url) {
+  if (!url) return null;
+  // https://store.shopping.yahoo.co.jp/{storeId}/{itemId}.html
+  const m1 = url.match(/store\.shopping\.yahoo\.co\.jp\/([^/]+)\/([^/?#.]+)/);
+  if (m1) return `${m1[1]}_${m1[2]}`;
+  // https://item.shopping.yahoo.co.jp/detail/{storeId}-{itemId}
+  const m2 = url.match(/item\.shopping\.yahoo\.co\.jp\/detail\/([^/?#]+)/);
+  if (m2) return m2[1].replace(/-/, "_");
+  return null;
+}
+
+async function submitToSekaiPocket(itemCode) {
+  const res = await fetch("/api/sekaipocket", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ itemCode }),
+  });
+  return res.json();
+}
+
 function Tag({ label, color }) {
   return (
     <span style={{
@@ -42,14 +62,24 @@ function Tag({ label, color }) {
 
 function ResultRow({ item, index }) {
   const [expanded, setExpanded] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState(null); // null | "loading" | "ok" | "error"
   const { profitJpy, profitRate } = calcProfit(item.buyPrice, item.sellPrice);
+
+  async function handleSubmit(e) {
+    e.stopPropagation();
+    const itemCode = extractYahooItemCode(item.rakutenUrl);
+    if (!itemCode) { setSubmitStatus("error"); return; }
+    setSubmitStatus("loading");
+    const result = await submitToSekaiPocket(itemCode);
+    setSubmitStatus(result.success ? "ok" : "error");
+  }
   return (
     <div style={{
       background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12,
       marginBottom: 10, overflow: "hidden", boxShadow: "0 1px 3px #0000000a",
     }}>
       <div onClick={() => setExpanded(!expanded)} style={{
-        display: "grid", gridTemplateColumns: "32px 60px 1fr auto auto auto",
+        display: "grid", gridTemplateColumns: "32px 60px 1fr auto auto auto auto",
         gap: 12, padding: "14px 16px", cursor: "pointer", alignItems: "center",
       }}>
         <span style={{ color: "#cbd5e1", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>
@@ -65,7 +95,7 @@ function ResultRow({ item, index }) {
             {item.title}
           </div>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <Tag label="楽天" color={platformColors.rakuten} />
+            <Tag label="Yahoo!" color={platformColors.yahoo} />
             {item.jan && <Tag label={`JAN: ${item.jan}`} color="#10b981" />}
           </div>
         </div>
@@ -90,6 +120,19 @@ function ResultRow({ item, index }) {
           </div>
           <div style={{ color: "#475569", fontSize: 11 }}>利益率</div>
         </div>
+        <button
+          onClick={handleSubmit}
+          disabled={submitStatus === "loading" || submitStatus === "ok"}
+          style={{
+            padding: "6px 12px", fontSize: 11, fontWeight: 700, borderRadius: 6, border: "none",
+            cursor: submitStatus === "loading" || submitStatus === "ok" ? "default" : "pointer",
+            background: submitStatus === "ok" ? "#d1fae5" : submitStatus === "error" ? "#fee2e2" : "#720E9E",
+            color: submitStatus === "ok" ? "#065f46" : submitStatus === "error" ? "#991b1b" : "#fff",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {submitStatus === "loading" ? "投入中..." : submitStatus === "ok" ? "✓ 投入済み" : submitStatus === "error" ? "✗ エラー" : "🌐 世界ポケット"}
+        </button>
       </div>
       {expanded && (
         <div style={{
