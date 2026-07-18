@@ -1,4 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+  return isMobile;
+}
 
 const RAKUTEN_APP_ID = import.meta.env.VITE_RAKUTEN_APP_ID || "";
 const YAHOO_CLIENT_ID = import.meta.env.VITE_YAHOO_CLIENT_ID || "";
@@ -60,10 +70,14 @@ function Tag({ label, color }) {
   );
 }
 
-function ResultRow({ item, index }) {
+function ResultRow({ item, index, isMobile }) {
   const [expanded, setExpanded] = useState(false);
-  const [submitStatus, setSubmitStatus] = useState(null); // null | "loading" | "ok" | "error"
+  const [submitStatus, setSubmitStatus] = useState(null);
   const { profitJpy, profitRate } = calcProfit(item.buyPrice, item.sellPrice);
+
+  const ebaySearchUrl = item.ebaySearchKeyword
+    ? `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(item.ebaySearchKeyword)}&LH_ItemCondition=1000`
+    : `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(item.title.slice(0, 40))}`;
 
   async function handleSubmit(e) {
     e.stopPropagation();
@@ -73,75 +87,103 @@ function ResultRow({ item, index }) {
     const result = await submitToSekaiPocket(itemCode);
     setSubmitStatus(result.success ? "ok" : "error");
   }
+
   return (
     <div style={{
       background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: 12,
       marginBottom: 10, overflow: "hidden", boxShadow: "0 1px 3px #0000000a",
     }}>
+      {/* ヘッダー行 - スマホは縦積み、PCは横グリッド */}
       <div onClick={() => setExpanded(!expanded)} style={{
-        display: "grid", gridTemplateColumns: "32px 60px 1fr auto auto auto auto",
-        gap: 12, padding: "14px 16px", cursor: "pointer", alignItems: "center",
+        padding: "12px 14px", cursor: "pointer",
+        display: isMobile ? "flex" : "grid",
+        gridTemplateColumns: isMobile ? undefined : "32px 60px 1fr auto auto auto auto",
+        flexDirection: isMobile ? "column" : undefined,
+        gap: isMobile ? 8 : 12,
+        alignItems: isMobile ? "stretch" : "center",
       }}>
-        <span style={{ color: "#cbd5e1", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>
-          {String(index + 1).padStart(2, "0")}
-        </span>
-        {item.imageUrl ? (
-          <img src={item.imageUrl} alt="" style={{ width: 52, height: 52, objectFit: "contain", borderRadius: 6, background: "#fff" }} />
-        ) : (
-          <div style={{ width: 52, height: 52, background: "#1e3a4a", borderRadius: 6 }} />
+        {!isMobile && (
+          <span style={{ color: "#cbd5e1", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>
+            {String(index + 1).padStart(2, "0")}
+          </span>
         )}
-        <div>
-          <div style={{ color: "#1e293b", fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-            {item.title}
-          </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            <Tag label="Yahoo!" color={platformColors.yahoo} />
-            {item.jan && <Tag label={`JAN: ${item.jan}`} color="#10b981" />}
+        {/* スマホ: 画像+タイトル横並び */}
+        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          {item.imageUrl ? (
+            <img src={item.imageUrl} alt="" style={{ width: 48, height: 48, objectFit: "contain", borderRadius: 6, background: "#fff", flexShrink: 0 }} />
+          ) : (
+            <div style={{ width: 48, height: 48, background: "#1e3a4a", borderRadius: 6, flexShrink: 0 }} />
+          )}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ color: "#1e293b", fontSize: 13, fontWeight: 600, marginBottom: 4,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: isMobile ? "normal" : "nowrap" }}>
+              {item.title}
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <Tag label="Yahoo!" color={platformColors.yahoo} />
+              {item.jan && <Tag label={`JAN`} color="#10b981" />}
+            </div>
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ color: "#0ea5e9", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
-            ¥{item.buyPrice?.toLocaleString() || "—"}
+        {/* 価格・利益率 */}
+        <div style={{
+          display: "flex", gap: 8,
+          justifyContent: isMobile ? "space-between" : undefined,
+          alignItems: "center",
+        }}>
+          {!isMobile && <>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: "#0ea5e9", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
+                ¥{item.buyPrice?.toLocaleString() || "—"}
+              </div>
+              <div style={{ color: "#94a3b8", fontSize: 11 }}>仕入れ</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ color: "#f59e0b", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
+                ${item.sellPrice || "—"}
+              </div>
+              <div style={{ color: "#94a3b8", fontSize: 11 }}>販売</div>
+            </div>
+          </>}
+          {isMobile && (
+            <div style={{ display: "flex", gap: 16, fontSize: 12, color: "#64748b" }}>
+              <span>仕入れ <b style={{color:"#0ea5e9"}}>¥{item.buyPrice?.toLocaleString()}</b></span>
+              <span>販売 <b style={{color:"#f59e0b"}}>${item.sellPrice}</b></span>
+            </div>
+          )}
+          <div style={{ textAlign: "right" }}>
+            <div style={{
+              color: profitRate > 30 ? "#10b981" : profitRate > 10 ? "#f59e0b" : "#ef4444",
+              fontFamily: "'DM Mono', monospace", fontSize: isMobile ? 16 : 14, fontWeight: 700,
+            }}>
+              {profitRate}%
+            </div>
+            {!isMobile && <div style={{ color: "#475569", fontSize: 11 }}>利益率</div>}
           </div>
-          <div style={{ color: "#94a3b8", fontSize: 11 }}>仕入れ価格</div>
+          <button
+            onClick={handleSubmit}
+            disabled={submitStatus === "loading" || submitStatus === "ok"}
+            style={{
+              padding: "6px 10px", fontSize: 11, fontWeight: 700, borderRadius: 6, border: "none",
+              cursor: submitStatus === "loading" || submitStatus === "ok" ? "default" : "pointer",
+              background: submitStatus === "ok" ? "#d1fae5" : submitStatus === "error" ? "#fee2e2" : "#720E9E",
+              color: submitStatus === "ok" ? "#065f46" : submitStatus === "error" ? "#991b1b" : "#fff",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {submitStatus === "loading" ? "投入中..." : submitStatus === "ok" ? "✓ 済" : submitStatus === "error" ? "✗" : "🌐"}
+          </button>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ color: "#f59e0b", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>
-            ${item.sellPrice || "—"}
-          </div>
-          <div style={{ color: "#94a3b8", fontSize: 11 }}>想定販売価格</div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{
-            color: profitRate > 30 ? "#10b981" : profitRate > 10 ? "#f59e0b" : "#ef4444",
-            fontFamily: "'DM Mono', monospace", fontSize: 14, fontWeight: 700,
-          }}>
-            {profitRate}%
-          </div>
-          <div style={{ color: "#475569", fontSize: 11 }}>利益率</div>
-        </div>
-        <button
-          onClick={handleSubmit}
-          disabled={submitStatus === "loading" || submitStatus === "ok"}
-          style={{
-            padding: "6px 12px", fontSize: 11, fontWeight: 700, borderRadius: 6, border: "none",
-            cursor: submitStatus === "loading" || submitStatus === "ok" ? "default" : "pointer",
-            background: submitStatus === "ok" ? "#d1fae5" : submitStatus === "error" ? "#fee2e2" : "#720E9E",
-            color: submitStatus === "ok" ? "#065f46" : submitStatus === "error" ? "#991b1b" : "#fff",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {submitStatus === "loading" ? "投入中..." : submitStatus === "ok" ? "✓ 投入済み" : submitStatus === "error" ? "✗ エラー" : "🌐 世界ポケット"}
-        </button>
       </div>
+      {/* 展開パネル */}
       {expanded && (
         <div style={{
-          borderTop: "1px solid #f1f5f9", padding: "14px 16px",
-          display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12,
+          borderTop: "1px solid #f1f5f9", padding: "12px 14px",
+          display: "flex", flexDirection: "column", gap: 8,
           background: "#f8fafc",
         }}>
           <div style={{
-            gridColumn: "1/-1", background: "#ffffff", borderRadius: 8, border: "1px solid #e2e8f0",
+            background: "#ffffff", borderRadius: 8, border: "1px solid #e2e8f0",
             padding: "10px 14px", color: "#475569", fontSize: 12, lineHeight: 1.8,
           }}>
             <span style={{ color: "#0ea5e9", fontWeight: 600 }}>利益試算：</span>
@@ -155,24 +197,36 @@ function ResultRow({ item, index }) {
               ※ eBay手数料{(EBAY_FEE_RATE * 100)}%＋${EBAY_FEE_FIXED}、送料${SHIPPING_USD}、為替{USD_JPY}円/ドルで計算
             </span>
           </div>
-          {item.rakutenUrl && (
-            <a href={item.rakutenUrl} target="_blank" rel="noreferrer" style={{
-              background: "#BF000011", border: "1px solid #BF000033",
-              borderRadius: 8, padding: "10px 14px", color: "#ef4444",
-              textDecoration: "none", fontSize: 12, display: "flex", alignItems: "center", gap: 8,
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {item.rakutenUrl && (
+              <a href={item.rakutenUrl} target="_blank" rel="noreferrer" style={{
+                flex: 1, minWidth: 120,
+                background: "#BF000011", border: "1px solid #BF000033",
+                borderRadius: 8, padding: "10px 14px", color: "#ef4444",
+                textDecoration: "none", fontSize: 12, display: "flex", alignItems: "center", gap: 6,
+              }}>
+                🛒 Yahoo!で見る
+              </a>
+            )}
+            <a href={ebaySearchUrl} target="_blank" rel="noreferrer" style={{
+              flex: 1, minWidth: 120,
+              background: "#E5323811", border: "1px solid #E5323833",
+              borderRadius: 8, padding: "10px 14px", color: "#E53238",
+              textDecoration: "none", fontSize: 12, display: "flex", alignItems: "center", gap: 6,
             }}>
-              🛒 楽天で見る（仕入れ）
+              🛍 eBayで見る（現行出品）
             </a>
-          )}
-          <div
-            onClick={() => navigator.clipboard?.writeText(item.rakutenUrl || "")}
-            style={{
-              background: "#0ea5e911", border: "1px solid #0ea5e933",
-              borderRadius: 8, padding: "10px 14px", color: "#7dd3fc",
-              fontSize: 12, display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
-            }}
-          >
-            📋 URLをコピー（世界ポケットに登録）
+            <div
+              onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(item.rakutenUrl || ""); }}
+              style={{
+                flex: 1, minWidth: 120,
+                background: "#0ea5e911", border: "1px solid #0ea5e933",
+                borderRadius: 8, padding: "10px 14px", color: "#7dd3fc",
+                fontSize: 12, display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+              }}
+            >
+              📋 URLコピー
+            </div>
           </div>
         </div>
       )}
@@ -311,6 +365,7 @@ const DEMO_EBAY_RESULTS = [
 ];
 
 export default function App() {
+  const isMobile = useIsMobile();
   const [activePhase, setActivePhase] = useState(1);
   const [keyword, setKeyword] = useState("");
   const [ebayKeyword, setEbayKeyword] = useState("");
@@ -352,6 +407,8 @@ export default function App() {
         results: "100",
         sort: "-sold",
         output: "json",
+        condition: "new",      // 新品のみ
+        in_stock: "true",      // 在庫あり
       });
 
       const res = await fetch(`/api/yahoo?${params}`);
@@ -365,21 +422,89 @@ export default function App() {
       const data = await res.json();
 
       const rawItems = data.hits || [];
-      const items = rawItems.map((Item) => {
+
+      // 予約・中古・在庫僅少・オリパを除外
+      const EXCLUDE_KEYWORDS = ["予約", "中古", "残りわずか", "取り寄せ", "入荷待ち", "【予約】", "pre-order", "オリパ", "くじ", "ガチャ"];
+      const today = new Date();
+      const filteredItems = rawItems.filter(Item => {
+        const condition = Item.condition || "";
+        if (condition && condition !== "new") return false;
+        // 名前に除外キーワードが含まれる場合はスキップ
+        if (EXCLUDE_KEYWORDS.some(kw => (Item.name || "").includes(kw))) return false;
+        // 発売日が未来の場合はスキップ（予約品）
+        if (Item.releaseDate) {
+          const releaseDate = new Date(Item.releaseDate);
+          if (releaseDate > today) return false;
+        }
+        // availability が "preOrder" や "outOfStock" の場合はスキップ
+        const availability = Item.availability || "";
+        if (["preOrder", "outOfStock", "backOrder"].includes(availability)) return false;
+        return true;
+      });
+
+      // Yahoo商品ごとにeBayの実際の販売価格を検索
+      setLog(`⏳ ${filteredItems.length}件のeBay販売価格を調査中...（予約・中古除外済み）`);
+      const items = [];
+      for (const Item of filteredItems) {
         const buyPrice = Item.price?.value || Item.price || 0;
-        const sellPrice = estimateSellPrice(buyPrice);
-        return {
+        let sellPrice = estimateSellPrice(buyPrice);
+        let ebayActualPrice = null;
+
+        try {
+          const jan = Item.janCode || null;
+          let searchKeyword = jan || "";
+
+          // JANコードがない場合はClaudeで英語キーワードを生成
+          if (!jan) {
+            const translateRes = await fetch("/api/translate-keyword", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: Item.name, jan }),
+            });
+            if (translateRes.ok) {
+              const translated = await translateRes.json();
+              searchKeyword = translated.keyword || (Item.name || "").slice(0, 50);
+            } else {
+              searchKeyword = (Item.name || "").slice(0, 50);
+            }
+          }
+
+          const ebayParams = new URLSearchParams({ keywords: searchKeyword, results: "5" });
+          const ebayRes = await fetch(`/api/ebay?${ebayParams}`);
+          if (ebayRes.ok) {
+            const ebayData = await ebayRes.json();
+            const ebayItems = ebayData.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || [];
+            if (ebayItems.length > 0) {
+              const buyPriceUsd = buyPrice / USD_JPY;
+              const prices = ebayItems
+                .map(i => parseFloat(i.sellingStatus?.[0]?.currentPrice?.[0]?.__value__ || "0"))
+                .filter(p => {
+                  if (p <= 0) return false;
+                  const ratio = p / buyPriceUsd;
+                  return ratio >= 1.2 && ratio <= 10;
+                });
+              if (prices.length > 0) {
+                ebayActualPrice = Math.min(...prices);
+                sellPrice = ebayActualPrice;
+              }
+            }
+          }
+        } catch (_) {}
+
+        items.push({
           title: (Item.name || "").slice(0, 60),
           buyPrice,
           sellPrice,
+          ebayActualPrice,
           imageUrl: Item.image?.medium || null,
           jan: Item.janCode || null,
           rakutenUrl: Item.url,
-        };
-      });
+          ebaySearchKeyword: searchKeyword,
+        });
+      }
 
       setResults(items);
-      setLog(`✅ ${items.length}件取得完了 — 利益率の高い順に並んでいます`);
+      setLog(`✅ ${items.length}件取得完了 — eBay実際価格で利益率を計算済み`);
     } catch (e) {
       setLog(`❌ エラー: ${e.message}`);
     }
@@ -518,11 +643,29 @@ export default function App() {
     })
     .filter(item => calcProfit(item.buyPrice, item.sellPrice).profitRate >= minProfitRate);
 
-  const phases = [
-    { phase: 1, label: "Yahoo仕入れ", icon: "🟢", active: true },
-    { phase: 2, label: "eBay売れ筋", icon: hasEbayKey ? "🟢" : "🟡", active: true },
-    { phase: 3, label: "ヤフオク仕入れ", icon: hasRakutenKey ? "🟢" : "🟡", active: true },
-    { phase: 4, label: "回転管理", icon: "🔄", active: true },
+  const PLATFORM_GROUPS = [
+    {
+      label: "仕入れ先",
+      platforms: [
+        { phase: 1, label: "Yahoo!", icon: "🛒", color: "#720E9E", ready: true },
+        { phase: 3, label: "ヤフオク", icon: "🔨", color: "#9333ea", ready: true },
+        { phase: 5, label: "Amazon", icon: "📦", color: "#FF9900", ready: false },
+        { phase: 6, label: "楽天", icon: "🎁", color: "#BF0000", ready: false },
+      ],
+    },
+    {
+      label: "売り先",
+      platforms: [
+        { phase: 2, label: "eBay", icon: "🛍", color: "#E53238", ready: true },
+        { phase: 7, label: "Shopee", icon: "🧡", color: "#EE4D2D", ready: false },
+      ],
+    },
+    {
+      label: "管理",
+      platforms: [
+        { phase: 4, label: "回転管理", icon: "🔄", color: "#10b981", ready: true },
+      ],
+    },
   ];
 
   return (
@@ -544,7 +687,7 @@ export default function App() {
           <div>
             <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: 0.5, color: "#0f172a" }}>CrossBorder Research</div>
             <div style={{ color: "#94a3b8", fontSize: 10, fontFamily: "'DM Mono', monospace", letterSpacing: 1 }}>
-              PHASE {activePhase} — {activePhase === 1 ? "楽天仕入れリサーチ" : "eBay売れ筋リサーチ"}
+              越境EC自動化システム
             </div>
           </div>
         </div>
@@ -570,95 +713,444 @@ export default function App() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 960, margin: "0 auto", padding: "32px 24px" }}>
-        {/* Phase Tabs */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 24 }}>
-          {phases.map(p => (
-            <div
-              key={p.phase}
-              onClick={() => p.active && setActivePhase(p.phase)}
-              style={{
-                background: activePhase === p.phase ? "#eff6ff" : "#ffffff",
-                border: `1px solid ${activePhase === p.phase ? "#bfdbfe" : "#e2e8f0"}`,
-                borderRadius: 10, padding: "10px 14px",
-                opacity: p.active ? 1 : 0.5,
-                cursor: p.active ? "pointer" : "default",
-              }}
-            >
-              <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "'DM Mono', monospace", marginBottom: 4 }}>PHASE {p.phase}</div>
-              <div style={{ color: activePhase === p.phase ? "#2563eb" : "#64748b", fontSize: 13, fontWeight: 600 }}>
-                {p.icon} {p.label}
-              </div>
-            </div>
-          ))}
-        </div>
+      <div style={{ maxWidth: 1400, margin: "0 auto", padding: isMobile ? "16px" : "24px 32px" }}>
 
-        {/* PHASE 1: 楽天リサーチ */}
-        {activePhase === 1 && (
-          <>
+        {/* モバイル: プラットフォーム横スクロールタブ */}
+        {isMobile && (
+          <div style={{ marginBottom: 12 }}>
+            {PLATFORM_GROUPS.map((group, gi) => (
+              <div key={gi} style={{ marginBottom: 10 }}>
+                <div style={{
+                  fontSize: 10, color: "#94a3b8", fontFamily: "'DM Mono', monospace",
+                  letterSpacing: 1, marginBottom: 6,
+                }}>
+                  {group.label}
+                </div>
+                <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+                  {group.platforms.map(p => (
+                    <button
+                      key={p.phase}
+                      onClick={() => p.ready && setActivePhase(p.phase)}
+                      style={{
+                        flexShrink: 0, padding: "6px 14px", borderRadius: 20, border: "none",
+                        cursor: p.ready ? "pointer" : "not-allowed",
+                        background: activePhase === p.phase ? p.color : p.ready ? "#f1f5f9" : "#f1f5f9",
+                        color: activePhase === p.phase ? "#fff" : p.ready ? "#374151" : "#9ca3af",
+                        fontSize: 12, fontWeight: 600,
+                        opacity: p.ready ? 1 : 0.5,
+                      }}
+                    >
+                      {p.icon} {p.label}
+                      {!p.ready && " 🚧"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 24, alignItems: "flex-start", flexDirection: isMobile ? "column" : "row" }}>
+
+          {/* LEFT SIDEBAR (PCのみ) */}
+          {!isMobile && <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Phase-specific search form */}
             <div style={{
               background: "#ffffff", border: "1px solid #e2e8f0",
-              borderRadius: 16, padding: 24, marginBottom: 24,
-              boxShadow: "0 1px 4px #0000000a",
+              borderRadius: 16, padding: 20, boxShadow: "0 1px 4px #0000000a",
             }}>
-              <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ color: "#64748b", fontSize: 11, display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace", letterSpacing: 1 }}>
-                    KEYWORD — 楽天で仕入れ先を検索
-                  </label>
-                  <input
-                    value={keyword}
-                    onChange={e => setKeyword(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && runRakutenSearch()}
-                    placeholder="例：アニメフィギュア、電気ケトル、日本酒..."
-                    style={{
-                      width: "100%", background: "#f8fafc", border: "1px solid #cbd5e1",
-                      borderRadius: 8, padding: "10px 14px", color: "#1e293b",
-                      fontSize: 14, boxSizing: "border-box", outline: "none",
-                    }}
-                  />
-                </div>
-                <div style={{ display: "flex", alignItems: "flex-end" }}>
+              {/* Phase 1: Yahoo仕入れ */}
+              {activePhase === 1 && (
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ color: "#64748b", fontSize: 11, display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace", letterSpacing: 1 }}>
+                      KEYWORD — Yahoo!で仕入れ先を検索
+                    </label>
+                    <input
+                      value={keyword}
+                      onChange={e => setKeyword(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && runRakutenSearch()}
+                      placeholder="例：アニメフィギュア、電気ケトル..."
+                      style={{
+                        width: "100%", background: "#f8fafc", border: "1px solid #cbd5e1",
+                        borderRadius: 8, padding: "10px 14px", color: "#1e293b",
+                        fontSize: 14, boxSizing: "border-box", outline: "none",
+                      }}
+                    />
+                  </div>
                   <button
                     onClick={runRakutenSearch}
                     disabled={loading || !keyword.trim()}
                     style={{
-                      padding: "11px 28px",
-                      background: loading ? "#cbd5e1" : "linear-gradient(135deg, #0ea5e9, #6366f1)",
+                      width: "100%", padding: "11px 0", marginBottom: 12,
+                      background: loading ? "#cbd5e1" : "linear-gradient(135deg, #720E9E, #9333ea)",
                       border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
                       cursor: loading ? "not-allowed" : "pointer", fontSize: 14,
                     }}
                   >
                     {loading ? "🔄 検索中..." : "🔍 リサーチ開始"}
                   </button>
-                </div>
-              </div>
-              <div style={{
-                display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center",
-                background: "#e2e8f0", borderRadius: 8, padding: "10px 14px",
-                fontSize: 11, color: "#64748b", fontFamily: "'DM Mono', monospace",
-              }}>
-                <span>💱 為替レート：{USD_JPY}円/USD</span>
-                <span>📦 国際送料：${SHIPPING_USD}</span>
-                <span>💳 eBay手数料：{(EBAY_FEE_RATE * 100)}%＋${EBAY_FEE_FIXED}</span>
-                <span>📈 想定マークアップ：2.2倍＋送料</span>
-                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
-                  🎯 利益率フィルター：
-                  <select
-                    value={minProfitRate}
-                    onChange={e => setMinProfitRate(Number(e.target.value))}
-                    style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, border: "1px solid #cbd5e1" }}
+                  <div style={{
+                    background: "#f8f0ff", borderRadius: 8, padding: "10px 12px",
+                    fontSize: 11, color: "#64748b", fontFamily: "'DM Mono', monospace",
+                    display: "flex", flexDirection: "column", gap: 4,
+                  }}>
+                    <span>💱 為替レート：{USD_JPY}円/USD</span>
+                    <span>📦 国際送料：${SHIPPING_USD}</span>
+                    <span>💳 eBay手数料：{(EBAY_FEE_RATE * 100)}%＋${EBAY_FEE_FIXED}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                      🎯 利益率フィルター：
+                      <select
+                        value={minProfitRate}
+                        onChange={e => setMinProfitRate(Number(e.target.value))}
+                        style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, border: "1px solid #cbd5e1" }}
+                      >
+                        <option value={0}>全て表示</option>
+                        <option value={20}>20%以上</option>
+                        <option value={30}>30%以上</option>
+                        <option value={40}>40%以上</option>
+                        <option value={50}>50%以上</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Phase 2: eBay売れ筋 */}
+              {activePhase === 2 && (
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ color: "#64748b", fontSize: 11, display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace", letterSpacing: 1 }}>
+                      KEYWORD — eBay売れ筋を検索（英語推奨）
+                    </label>
+                    <input
+                      value={ebayKeyword}
+                      onChange={e => setEbayKeyword(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && runEbaySearch()}
+                      placeholder="例：japanese figure, anime..."
+                      style={{
+                        width: "100%", background: "#f8fafc", border: "1px solid #cbd5e1",
+                        borderRadius: 8, padding: "10px 14px", color: "#1e293b",
+                        fontSize: 14, boxSizing: "border-box", outline: "none",
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={runEbaySearch}
+                    disabled={loading || !ebayKeyword.trim()}
+                    style={{
+                      width: "100%", padding: "11px 0", marginBottom: 12,
+                      background: loading ? "#cbd5e1" : "linear-gradient(135deg, #E53238, #c0392b)",
+                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
+                      cursor: loading ? "not-allowed" : "pointer", fontSize: 14,
+                    }}
                   >
-                    <option value={0}>全て表示</option>
-                    <option value={20}>20%以上</option>
-                    <option value={30}>30%以上</option>
-                    <option value={40}>40%以上</option>
-                    <option value={50}>50%以上</option>
-                  </select>
-                </span>
-              </div>
+                    {loading ? "🔄 検索中..." : "🛍 eBay検索"}
+                  </button>
+                  <div style={{
+                    background: "#fff1f0", borderRadius: 8, padding: "10px 12px",
+                    fontSize: 11, color: "#7f1d1d", fontFamily: "'DM Mono', monospace",
+                    display: "flex", flexDirection: "column", gap: 4,
+                  }}>
+                    <span>🛍 eBay成約済み商品を検索</span>
+                    <span>📊 実際に売れた価格から利益を逆算</span>
+                    {!hasEbayKey && <span style={{ color: "#d97706" }}>⚠ APIキー未設定 — デモ表示中</span>}
+                  </div>
+                </>
+              )}
+
+              {/* Phase 3: ヤフオク仕入れ */}
+              {activePhase === 3 && (
+                <>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ color: "#64748b", fontSize: 11, display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace", letterSpacing: 1 }}>
+                      KEYWORD — ヤフオク!で中古を検索
+                    </label>
+                    <input
+                      value={yahooAuctionKeyword}
+                      onChange={e => setYahooAuctionKeyword(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && runYahooAuctionSearch()}
+                      placeholder="例：アニメフィギュア、ゲーム、カメラ..."
+                      style={{
+                        width: "100%", background: "#f8fafc", border: "1px solid #cbd5e1",
+                        borderRadius: 8, padding: "10px 14px", color: "#1e293b",
+                        fontSize: 14, boxSizing: "border-box", outline: "none",
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={runYahooAuctionSearch}
+                    disabled={loading || !yahooAuctionKeyword.trim()}
+                    style={{
+                      width: "100%", padding: "11px 0", marginBottom: 12,
+                      background: loading ? "#cbd5e1" : "linear-gradient(135deg, #720E9E, #9333ea)",
+                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
+                      cursor: loading ? "not-allowed" : "pointer", fontSize: 14,
+                    }}
+                  >
+                    {loading ? "🔄 検索中..." : "🔨 ヤフオク検索"}
+                  </button>
+                  <div style={{
+                    background: "#f3e8ff", borderRadius: 8, padding: "10px 12px",
+                    fontSize: 11, color: "#581c87", fontFamily: "'DM Mono', monospace",
+                    display: "flex", flexDirection: "column", gap: 4,
+                  }}>
+                    <span>🔨 ヤフオク!の即決・落札価格を検索</span>
+                    <span>💡 中古品を安く仕入れてeBayで売る</span>
+                  </div>
+                </>
+              )}
+
+              {/* Phase 4: 回転管理 */}
+              {activePhase === 4 && (
+                <>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a", marginBottom: 8 }}>
+                    🔄 eBay出品回転管理
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14, lineHeight: 1.6 }}>
+                    出品中の商品を一覧表示。売れていない商品（30日以上）を検出して入れ替え候補に追加できます。
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setListingsLoading(true);
+                      setListingsLog("🔍 eBay出品一覧を取得中...");
+                      try {
+                        const res = await fetch("/api/ebay-listings");
+                        const data = await res.json();
+                        if (data.error) {
+                          setListingsLog(`❌ エラー: ${data.error}`);
+                        } else {
+                          setMyListings(data.items || []);
+                          setListingsLog(`✅ ${data.total}件の出品中商品を取得 — 長期出品順に表示`);
+                        }
+                      } catch (e) {
+                        setListingsLog(`❌ ${e.message}`);
+                      }
+                      setListingsLoading(false);
+                    }}
+                    disabled={listingsLoading}
+                    style={{
+                      width: "100%", padding: "11px 0",
+                      background: listingsLoading ? "#cbd5e1" : "linear-gradient(135deg, #10b981, #0d9488)",
+                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
+                      cursor: listingsLoading ? "not-allowed" : "pointer", fontSize: 14,
+                    }}
+                  >
+                    {listingsLoading ? "🔄 取得中..." : "📋 出品一覧を取得"}
+                  </button>
+                  {replaceList.length > 0 && (
+                    <div style={{
+                      marginTop: 10, background: "#fef3c7", border: "1px solid #fcd34d",
+                      borderRadius: 8, padding: "8px 12px", fontSize: 12, color: "#92400e",
+                    }}>
+                      ⚠ 入れ替え候補 {replaceList.length}件
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* Coming soon phases */}
+              {[5, 6, 7].includes(activePhase) && (
+                <div style={{ textAlign: "center", padding: "20px 0", color: "#94a3b8" }}>
+                  <div style={{ fontSize: 32, marginBottom: 8 }}>🚧</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>準備中</div>
+                  <div style={{ fontSize: 11, marginTop: 4 }}>近日対応予定</div>
+                </div>
+              )}
             </div>
 
+            {/* Platform Navigation */}
+            <div style={{
+              background: "#ffffff", border: "1px solid #e2e8f0",
+              borderRadius: 16, padding: 16, boxShadow: "0 1px 4px #0000000a",
+            }}>
+              {PLATFORM_GROUPS.map((group, gi) => (
+                <div key={gi} style={{ marginBottom: gi < PLATFORM_GROUPS.length - 1 ? 16 : 0 }}>
+                  <div style={{
+                    fontSize: 10, color: "#94a3b8", fontFamily: "'DM Mono', monospace",
+                    letterSpacing: 1, marginBottom: 8, paddingBottom: 6,
+                    borderBottom: "1px solid #f1f5f9",
+                  }}>
+                    {group.label}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: group.platforms.length === 1 ? "1fr" : "1fr 1fr", gap: 6 }}>
+                    {group.platforms.map(p => (
+                      <button
+                        key={p.phase}
+                        onClick={() => p.ready && setActivePhase(p.phase)}
+                        style={{
+                          padding: "8px 10px", borderRadius: 8, border: "none",
+                          cursor: p.ready ? "pointer" : "not-allowed",
+                          background: activePhase === p.phase
+                            ? p.color + "22"
+                            : p.ready ? "#f8fafc" : "#f1f5f9",
+                          boxShadow: activePhase === p.phase ? `inset 0 0 0 1.5px ${p.color}` : "inset 0 0 0 1px #e2e8f0",
+                          textAlign: "left", position: "relative", overflow: "hidden",
+                          opacity: p.ready ? 1 : 0.6,
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        <div style={{ fontSize: 14, marginBottom: 2 }}>{p.icon}</div>
+                        <div style={{
+                          fontSize: 11, fontWeight: 700,
+                          color: activePhase === p.phase ? p.color : p.ready ? "#374151" : "#9ca3af",
+                        }}>
+                          {p.label}
+                        </div>
+                        {!p.ready && (
+                          <div style={{
+                            fontSize: 9, color: "#9ca3af", fontFamily: "'DM Mono', monospace",
+                            letterSpacing: 0.5,
+                          }}>
+                            準備中
+                          </div>
+                        )}
+                        {p.ready && activePhase === p.phase && (
+                          <div style={{
+                            position: "absolute", top: 4, right: 6,
+                            width: 6, height: 6, borderRadius: "50%",
+                            background: p.color,
+                          }} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+          </div>}{/* end LEFT SIDEBAR (PC) */}
+
+          {/* モバイル: 検索フォーム（全幅） */}
+          {isMobile && (
+            <div style={{
+              width: "100%", background: "#ffffff", border: "1px solid #e2e8f0",
+              borderRadius: 16, padding: 16, boxShadow: "0 1px 4px #0000000a",
+            }}>
+              {activePhase === 1 && (
+                <>
+                  <input
+                    value={keyword}
+                    onChange={e => setKeyword(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && runRakutenSearch()}
+                    placeholder="例：アニメフィギュア、電気ケトル..."
+                    style={{
+                      width: "100%", background: "#f8fafc", border: "1px solid #cbd5e1",
+                      borderRadius: 8, padding: "10px 14px", color: "#1e293b",
+                      fontSize: 14, boxSizing: "border-box", outline: "none", marginBottom: 10,
+                    }}
+                  />
+                  <button
+                    onClick={runRakutenSearch}
+                    disabled={loading || !keyword.trim()}
+                    style={{
+                      width: "100%", padding: "11px 0",
+                      background: loading ? "#cbd5e1" : "linear-gradient(135deg, #720E9E, #9333ea)",
+                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
+                      cursor: loading ? "not-allowed" : "pointer", fontSize: 14,
+                    }}
+                  >
+                    {loading ? "🔄 検索中..." : "🔍 リサーチ開始"}
+                  </button>
+                </>
+              )}
+              {activePhase === 2 && (
+                <>
+                  <input
+                    value={ebayKeyword}
+                    onChange={e => setEbayKeyword(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && runEbaySearch()}
+                    placeholder="例：japanese figure, anime..."
+                    style={{
+                      width: "100%", background: "#f8fafc", border: "1px solid #cbd5e1",
+                      borderRadius: 8, padding: "10px 14px", color: "#1e293b",
+                      fontSize: 14, boxSizing: "border-box", outline: "none", marginBottom: 10,
+                    }}
+                  />
+                  <button
+                    onClick={runEbaySearch}
+                    disabled={loading || !ebayKeyword.trim()}
+                    style={{
+                      width: "100%", padding: "11px 0",
+                      background: loading ? "#cbd5e1" : "linear-gradient(135deg, #E53238, #c0392b)",
+                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
+                      cursor: loading ? "not-allowed" : "pointer", fontSize: 14,
+                    }}
+                  >
+                    {loading ? "🔄 検索中..." : "🛍 eBay検索"}
+                  </button>
+                </>
+              )}
+              {activePhase === 3 && (
+                <>
+                  <input
+                    value={yahooAuctionKeyword}
+                    onChange={e => setYahooAuctionKeyword(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && runYahooAuctionSearch()}
+                    placeholder="例：アニメフィギュア、ゲーム..."
+                    style={{
+                      width: "100%", background: "#f8fafc", border: "1px solid #cbd5e1",
+                      borderRadius: 8, padding: "10px 14px", color: "#1e293b",
+                      fontSize: 14, boxSizing: "border-box", outline: "none", marginBottom: 10,
+                    }}
+                  />
+                  <button
+                    onClick={runYahooAuctionSearch}
+                    disabled={loading || !yahooAuctionKeyword.trim()}
+                    style={{
+                      width: "100%", padding: "11px 0",
+                      background: loading ? "#cbd5e1" : "linear-gradient(135deg, #720E9E, #9333ea)",
+                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
+                      cursor: loading ? "not-allowed" : "pointer", fontSize: 14,
+                    }}
+                  >
+                    {loading ? "🔄 検索中..." : "🔨 ヤフオク検索"}
+                  </button>
+                </>
+              )}
+              {activePhase === 4 && (
+                <button
+                  onClick={async () => {
+                    setListingsLoading(true);
+                    setListingsLog("🔍 eBay出品一覧を取得中...");
+                    try {
+                      const res = await fetch("/api/ebay-listings");
+                      const data = await res.json();
+                      if (data.error) {
+                        setListingsLog(`❌ エラー: ${data.error}`);
+                      } else {
+                        setMyListings(data.items || []);
+                        setListingsLog(`✅ ${data.total}件の出品中商品を取得`);
+                      }
+                    } catch (e) {
+                      setListingsLog(`❌ ${e.message}`);
+                    }
+                    setListingsLoading(false);
+                  }}
+                  disabled={listingsLoading}
+                  style={{
+                    width: "100%", padding: "11px 0",
+                    background: listingsLoading ? "#cbd5e1" : "linear-gradient(135deg, #10b981, #0d9488)",
+                    border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
+                    cursor: listingsLoading ? "not-allowed" : "pointer", fontSize: 14,
+                  }}
+                >
+                  {listingsLoading ? "🔄 取得中..." : "📋 出品一覧を取得"}
+                </button>
+              )}
+              {[5, 6, 7].includes(activePhase) && (
+                <div style={{ textAlign: "center", color: "#94a3b8", padding: "10px 0" }}>🚧 準備中</div>
+              )}
+            </div>
+          )}
+
+          {/* RIGHT CONTENT */}
+          <div style={{ flex: 1, minWidth: 0, width: isMobile ? "100%" : undefined }}>
+
+        {/* PHASE 1: Yahoo仕入れリサーチ */}
+        {activePhase === 1 && (
+          <>
             {log && (
               <div style={{
                 background: "#f1f5f9", border: "1px solid #e2e8f0",
@@ -682,7 +1174,7 @@ export default function App() {
                   </div>
                 </div>
                 {sortedResults.map((item, i) => (
-                  <ResultRow key={i} item={item} index={i} />
+                  <ResultRow key={i} item={item} index={i} isMobile={isMobile} />
                 ))}
               </div>
             )}
@@ -692,7 +1184,7 @@ export default function App() {
                 <div style={{ fontSize: 48, marginBottom: 16 }}>🔎</div>
                 <div style={{ fontSize: 14, color: "#94a3b8" }}>キーワードを入力してリサーチを開始してください</div>
                 <div style={{ fontSize: 12, marginTop: 8, color: "#cbd5e1" }}>
-                  楽天市場から仕入れ候補を検索 → 利益計算 → 世界ポケットに登録
+                  Yahoo!ショッピングから仕入れ候補を検索 → 利益計算 → 世界ポケットに登録
                 </div>
               </div>
             )}
@@ -702,53 +1194,6 @@ export default function App() {
         {/* PHASE 3: ヤフオク仕入れ */}
         {activePhase === 3 && (
           <>
-            <div style={{
-              background: "#ffffff", border: "1px solid #e2e8f0",
-              borderRadius: 16, padding: 24, marginBottom: 24,
-              boxShadow: "0 1px 4px #0000000a",
-            }}>
-              <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ color: "#64748b", fontSize: 11, display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace", letterSpacing: 1 }}>
-                    KEYWORD — ヤフオク!で中古・掘り出し物を検索
-                  </label>
-                  <input
-                    value={yahooAuctionKeyword}
-                    onChange={e => setYahooAuctionKeyword(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && runYahooAuctionSearch()}
-                    placeholder="例：アニメフィギュア、ゲーム、カメラ..."
-                    style={{
-                      width: "100%", background: "#f8fafc", border: "1px solid #cbd5e1",
-                      borderRadius: 8, padding: "10px 14px", color: "#1e293b",
-                      fontSize: 14, boxSizing: "border-box", outline: "none",
-                    }}
-                  />
-                </div>
-                <div style={{ display: "flex", alignItems: "flex-end" }}>
-                  <button
-                    onClick={runYahooAuctionSearch}
-                    disabled={loading || !yahooAuctionKeyword.trim()}
-                    style={{
-                      padding: "11px 28px",
-                      background: loading ? "#cbd5e1" : "linear-gradient(135deg, #720E9E, #9333ea)",
-                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
-                      cursor: loading ? "not-allowed" : "pointer", fontSize: 14,
-                    }}
-                  >
-                    {loading ? "🔄 検索中..." : "🔨 ヤフオク検索"}
-                  </button>
-                </div>
-              </div>
-              <div style={{
-                display: "flex", gap: 16, flexWrap: "wrap",
-                background: "#f3e8ff", borderRadius: 8, padding: "10px 14px",
-                fontSize: 11, color: "#581c87", fontFamily: "'DM Mono', monospace",
-              }}>
-                <span>🔨 ヤフオク!の即決・落札価格を検索</span>
-                <span>💡 中古品を安く仕入れてeBayで売る</span>
-              </div>
-            </div>
-
             {yahooAuctionLog && (
               <div style={{
                 background: "#f1f5f9", border: "1px solid #e2e8f0",
@@ -829,54 +1274,6 @@ export default function App() {
         {/* PHASE 2: eBay売れ筋 */}
         {activePhase === 2 && (
           <>
-            <div style={{
-              background: "#ffffff", border: "1px solid #e2e8f0",
-              borderRadius: 16, padding: 24, marginBottom: 24,
-              boxShadow: "0 1px 4px #0000000a",
-            }}>
-              <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ color: "#64748b", fontSize: 11, display: "block", marginBottom: 6, fontFamily: "'DM Mono', monospace", letterSpacing: 1 }}>
-                    KEYWORD — eBayで売れている日本商品を検索（英語推奨）
-                  </label>
-                  <input
-                    value={ebayKeyword}
-                    onChange={e => setEbayKeyword(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && runEbaySearch()}
-                    placeholder="例：japanese figure, japan sake, anime..."
-                    style={{
-                      width: "100%", background: "#f8fafc", border: "1px solid #cbd5e1",
-                      borderRadius: 8, padding: "10px 14px", color: "#1e293b",
-                      fontSize: 14, boxSizing: "border-box", outline: "none",
-                    }}
-                  />
-                </div>
-                <div style={{ display: "flex", alignItems: "flex-end" }}>
-                  <button
-                    onClick={runEbaySearch}
-                    disabled={loading || !ebayKeyword.trim()}
-                    style={{
-                      padding: "11px 28px",
-                      background: loading ? "#cbd5e1" : "linear-gradient(135deg, #E53238, #c0392b)",
-                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
-                      cursor: loading ? "not-allowed" : "pointer", fontSize: 14,
-                    }}
-                  >
-                    {loading ? "🔄 検索中..." : "🛍 eBay検索"}
-                  </button>
-                </div>
-              </div>
-              <div style={{
-                display: "flex", gap: 16, flexWrap: "wrap",
-                background: "#fee2e2", borderRadius: 8, padding: "10px 14px",
-                fontSize: 11, color: "#7f1d1d", fontFamily: "'DM Mono', monospace",
-              }}>
-                <span>🛍 eBay成約済み商品を検索</span>
-                <span>📊 実際に売れた価格から利益を逆算</span>
-                {!hasEbayKey && <span style={{ color: "#d97706" }}>⚠ eBay APIキー未設定 — デモ表示中</span>}
-              </div>
-            </div>
-
             {ebayLog && (
               <div style={{
                 background: "#f1f5f9", border: "1px solid #e2e8f0",
@@ -910,7 +1307,7 @@ export default function App() {
                 <div style={{ fontSize: 48, marginBottom: 16 }}>🛍</div>
                 <div style={{ fontSize: 14, color: "#94a3b8" }}>eBayで売れている日本商品を検索します</div>
                 <div style={{ fontSize: 12, marginTop: 8, color: "#cbd5e1" }}>
-                  成約済み価格から仕入れ上限を逆算 → 楽天で仕入れ先を探す
+                  成約済み価格から仕入れ上限を逆算 → Yahoo!で仕入れ先を探す
                 </div>
               </div>
             )}
@@ -919,59 +1316,6 @@ export default function App() {
         {/* PHASE 4: 回転管理 */}
         {activePhase === 4 && (
           <>
-            <div style={{
-              background: "#ffffff", border: "1px solid #e2e8f0",
-              borderRadius: 16, padding: 24, marginBottom: 24,
-              boxShadow: "0 1px 4px #0000000a",
-            }}>
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 6 }}>
-                  🔄 eBay出品回転管理
-                </div>
-                <div style={{ fontSize: 12, color: "#64748b" }}>
-                  出品中の商品を一覧表示。売れていない商品（30日以上）を検出して入れ替え候補に追加できます。
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                <button
-                  onClick={async () => {
-                    setListingsLoading(true);
-                    setListingsLog("🔍 eBay出品一覧を取得中...");
-                    try {
-                      const res = await fetch("/api/ebay-listings");
-                      const data = await res.json();
-                      if (data.error) {
-                        setListingsLog(`❌ エラー: ${data.error}`);
-                      } else {
-                        setMyListings(data.items || []);
-                        setListingsLog(`✅ ${data.total}件の出品中商品を取得 — 長期出品順に表示`);
-                      }
-                    } catch (e) {
-                      setListingsLog(`❌ ${e.message}`);
-                    }
-                    setListingsLoading(false);
-                  }}
-                  disabled={listingsLoading}
-                  style={{
-                    padding: "11px 28px",
-                    background: listingsLoading ? "#cbd5e1" : "linear-gradient(135deg, #10b981, #0d9488)",
-                    border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
-                    cursor: listingsLoading ? "not-allowed" : "pointer", fontSize: 14,
-                  }}
-                >
-                  {listingsLoading ? "🔄 取得中..." : "📋 出品一覧を取得"}
-                </button>
-                {replaceList.length > 0 && (
-                  <div style={{
-                    background: "#fef3c7", border: "1px solid #fcd34d",
-                    borderRadius: 8, padding: "8px 16px", fontSize: 12, color: "#92400e",
-                  }}>
-                    ⚠ 入れ替え候補 {replaceList.length}件
-                  </div>
-                )}
-              </div>
-            </div>
-
             {listingsLog && (
               <div style={{
                 background: "#f1f5f9", border: "1px solid #e2e8f0",
@@ -1105,6 +1449,8 @@ export default function App() {
           </>
         )}
 
+          </div>{/* end RIGHT CONTENT */}
+        </div>{/* end flex row */}
       </div>
     </div>
   );
