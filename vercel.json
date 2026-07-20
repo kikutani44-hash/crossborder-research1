@@ -1,0 +1,14 @@
+{
+  "crons": [
+    {
+      "path": "/api/auto-scan",
+      "schedule": "0 18 * * *"
+    }
+  ],
+  "functions": {
+    "api/auto-scan.js": { "maxDuration": 300 },
+    "api/ebay-sold.js": { "maxDuration": 300 },
+    "api/research.js": { "maxDuration": 300 },
+    "api/seller-research.js": { "maxDuration": 300 }
+  }
+}
