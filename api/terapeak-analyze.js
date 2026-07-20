@@ -38,6 +38,8 @@ export default async function handler(req, res) {
   const amazonSecretKey = process.env.AMAZON_SECRET_KEY;
   const amazonPartnerTag = process.env.AMAZON_PARTNER_TAG;
   const hasAmazon = !!(amazonAccessKey && amazonSecretKey && amazonPartnerTag);
+  const rakutenAppId = process.env.RAKUTEN_APP_ID;
+  const hasRakuten = !!rakutenAppId;
   const log = [];
 
   // フィルタ（平均価格$10以上・販売数は任意）
@@ -128,19 +130,44 @@ export default async function handler(req, res) {
       } catch (_) {}
     }
 
-    // 最安仕入れ先を選択
-    let bestPrice = null, bestUrl = null, bestName = null, bestSource = null;
-    if (yahooPrice && amazonPrice) {
-      if (yahooPrice <= amazonPrice) {
-        bestPrice = yahooPrice; bestUrl = yahooUrl; bestName = yahooName; bestSource = "yahoo";
-      } else {
-        bestPrice = amazonPrice; bestUrl = amazonUrl; bestName = amazonName; bestSource = "amazon";
+    // 楽天市場仕入れ価格検索（詳細 → 短縮の順でリトライ）
+    let rakutenPrice = null, rakutenUrl = null, rakutenName = null;
+    if (hasRakuten) {
+      const searchKeywords = [jaKeyword, jaKeywordShort].filter(Boolean);
+      for (const kw of searchKeywords) {
+        if (rakutenPrice) break;
+        try {
+          const rRes = await fetch(
+            `https://app.rakuten.co.jp/services/api/IchibaItem/Search/20220601` +
+            `?applicationId=${rakutenAppId}&format=json&keyword=${encodeURIComponent(kw)}&hits=15&sort=%2BitemPrice`
+          );
+          const rData = await rRes.json();
+          const rItems = (rData.Items || [])
+            .map(w => w.Item)
+            .filter(i => (i.itemPrice || 0) >= minPrice && i.availability === 1);
+          if (rItems.length > 0) {
+            rItems.sort((a, b) => (a.itemPrice || 0) - (b.itemPrice || 0));
+            rakutenPrice = rItems[0].itemPrice;
+            rakutenUrl = rItems[0].itemUrl;
+            rakutenName = (rItems[0].itemName || "").slice(0, 50);
+          }
+        } catch (_) {}
+        await sleep(100);
       }
-    } else if (yahooPrice) {
-      bestPrice = yahooPrice; bestUrl = yahooUrl; bestName = yahooName; bestSource = "yahoo";
-    } else if (amazonPrice) {
-      bestPrice = amazonPrice; bestUrl = amazonUrl; bestName = amazonName; bestSource = "amazon";
     }
+
+    // 最安仕入れ先を選択（Yahoo! / Amazon / 楽天の3択）
+    const candidates = [
+      { source: "yahoo",   price: yahooPrice,   url: yahooUrl,   name: yahooName },
+      { source: "amazon",  price: amazonPrice,  url: amazonUrl,  name: amazonName },
+      { source: "rakuten", price: rakutenPrice, url: rakutenUrl, name: rakutenName },
+    ].filter(c => c.price !== null);
+    candidates.sort((a, b) => a.price - b.price);
+    const best = candidates[0] || null;
+    const bestPrice = best?.price ?? null;
+    const bestUrl   = best?.url   ?? null;
+    const bestName  = best?.name  ?? null;
+    const bestSource = best?.source ?? null;
 
     const { profitJpy, profitRate } = bestPrice
       ? calcProfit(bestPrice, ebayPriceUsd)
@@ -154,6 +181,7 @@ export default async function handler(req, res) {
       jaKeyword,
       yahooPrice, yahooUrl, yahooName,
       amazonPrice, amazonUrl, amazonName, amazonAsin,
+      rakutenPrice, rakutenUrl, rakutenName,
       bestPrice, bestUrl, bestName, bestSource,
       profitJpy,
       profitRate,

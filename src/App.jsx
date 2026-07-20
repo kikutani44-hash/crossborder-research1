@@ -2070,6 +2070,15 @@ export default function App() {
                                   )}
                                 </div>
                               )}
+                              {item.bestSource === "rakuten" && item.rakutenUrl && (
+                                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                  <span style={{ background: "#BF0000", color: "#fff", fontSize: 10, padding: "1px 6px", borderRadius: 3, fontWeight: 700 }}>楽天</span>
+                                  <a href={item.rakutenUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0369a1" }}>
+                                    ¥{item.bestPrice?.toLocaleString()} — {item.rakutenName}
+                                  </a>
+                                  <button onClick={() => navigator.clipboard.writeText(item.rakutenUrl)} style={{ fontSize: 10, padding: "1px 6px", border: "1px solid #fca5a5", borderRadius: 4, background: "#fff5f5", cursor: "pointer", color: "#BF0000" }}>URLコピー</button>
+                                </div>
+                              )}
                               {item.yahooPrice && item.amazonPrice && (
                                 <div style={{ fontSize: 11, color: "#94a3b8" }}>
                                   Yahoo! ¥{item.yahooPrice?.toLocaleString()} / Amazon ¥{item.amazonPrice?.toLocaleString()} → 最安を選択
