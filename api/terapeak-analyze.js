@@ -54,6 +54,7 @@ export default async function handler(req, res) {
     // Claude: eBayタイトル → Yahoo!日本語キーワード（汎用版）
     let jaKeyword = "";
     let jaKeywordShort = "";
+    let jaKeywordMin = "";
     if (anthropicKey) {
       try {
         const tr = await fetch("https://api.anthropic.com/v1/messages", {
@@ -65,15 +66,17 @@ export default async function handler(req, res) {
           },
           body: JSON.stringify({
             model: "claude-haiku-4-5-20251001",
-            max_tokens: 120,
+            max_tokens: 150,
             messages: [{
               role: "user",
-              content: `以下のeBay商品タイトルから、Yahoo!ショッピングで同一商品を検索するための日本語キーワードを2行で返してください。
+              content: `以下のeBay商品タイトルから、Yahoo!ショッピングで同一商品を検索するための日本語キーワードを3行で返してください。
 1行目: 詳細キーワード（ブランド名・型番・商品種別・特徴を含む3〜5語）
 2行目: 短縮キーワード（ブランド名と商品種別のみ1〜2語）
+3行目: 最小キーワード（商品種別のみ1語、または最も特徴的な固有名詞1語）
 説明不要。例：
 1行目: G-SHOCK GW-5000 電波ソーラー 腕時計 日本製
 2行目: G-SHOCK 腕時計
+3行目: G-SHOCK
 タイトル: ${item.title}`,
             }],
           }),
@@ -82,6 +85,7 @@ export default async function handler(req, res) {
         const lines = (td.content?.[0]?.text?.trim() || "").split("\n").map(l => l.replace(/^\d行目[:：]\s*/, "").trim());
         jaKeyword = lines[0] || "";
         jaKeywordShort = lines[1] || jaKeyword.split(/\s/).slice(0, 2).join(" ");
+        jaKeywordMin = lines[2] || jaKeyword.split(/\s/)[0] || "";
       } catch (_) {}
     }
 
@@ -90,7 +94,7 @@ export default async function handler(req, res) {
     // Yahoo!Japan仕入れ価格検索（詳細キーワード → 短縮キーワードの順でリトライ）
     let yahooPrice = null, yahooUrl = null, yahooName = null;
     if (yahooClientId) {
-      const searchKeywords = [jaKeyword, jaKeywordShort].filter(Boolean);
+      const searchKeywords = [jaKeyword, jaKeywordShort, jaKeywordMin].filter(Boolean);
       for (const kw of searchKeywords) {
         if (yahooPrice) break;
         try {
@@ -133,7 +137,7 @@ export default async function handler(req, res) {
     // 楽天市場仕入れ価格検索（詳細 → 短縮の順でリトライ）
     let rakutenPrice = null, rakutenUrl = null, rakutenName = null;
     if (hasRakuten) {
-      const searchKeywords = [jaKeyword, jaKeywordShort].filter(Boolean);
+      const searchKeywords = [jaKeyword, jaKeywordShort, jaKeywordMin].filter(Boolean);
       for (const kw of searchKeywords) {
         if (rakutenPrice) break;
         try {
