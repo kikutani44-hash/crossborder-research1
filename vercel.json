@@ -4,12 +4,5 @@
       "path": "/api/auto-scan",
       "schedule": "0 18 * * *"
     }
-  ],
-  "functions": {
-    "api/auto-scan.js": { "maxDuration": 60 },
-    "api/ebay-sold.js": { "maxDuration": 60 },
-    "api/research.js": { "maxDuration": 60 },
-    "api/seller-research.js": { "maxDuration": 60 },
-    "api/accumulated-results.js": { "maxDuration": 30 }
-  }
+  ]
 }
