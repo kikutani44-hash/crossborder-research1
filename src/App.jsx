@@ -1603,17 +1603,63 @@ export default function App() {
         {/* PHASE 0: 蓄積利益商品リスト */}
         {activePhase === 0 && (
           <>
-            <div style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>
-                💰 利益商品リスト
-                <span style={{ marginLeft: 10, fontSize: 12, color: "#94a3b8", fontWeight: 400 }}>
-                  VPSが自動収集・30分毎更新
-                </span>
+            {/* ヘッダー＋フィルター（モバイルでもアクセス可能） */}
+            <div style={{
+              background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
+              padding: "12px 16px", marginBottom: 12, boxShadow: "0 1px 3px #0000000a",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: isMobile ? 10 : 0 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>💰 利益商品リスト</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8" }}>VPS自動収集 · 30分毎更新 · 累計{accumulatedResults.length}件</div>
+                </div>
+                <button
+                  onClick={() => {
+                    setAccumulatedLoading(true);
+                    fetch("/api/accumulated-results")
+                      .then(r => r.json())
+                      .then(data => setAccumulatedResults(data.results || []))
+                      .catch(() => {})
+                      .finally(() => setAccumulatedLoading(false));
+                  }}
+                  style={{
+                    padding: "6px 14px", background: "#f0fdf4", border: "1px solid #6ee7b7",
+                    borderRadius: 8, color: "#065f46", fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  }}
+                >
+                  {accumulatedLoading ? "🔄" : "🔄 更新"}
+                </button>
               </div>
-              <div style={{ fontSize: 12, color: "#64748b" }}>
-                {accumulatedResults.filter(r => r.profitRate >= accumulatedFilter).length}件表示
+              {/* フィルターバー（モバイル・PC共通） */}
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: isMobile ? 0 : 10 }}>
+                {[
+                  { label: "全て", value: 0 },
+                  { label: "30%+", value: 30 },
+                  { label: "40%+", value: 40 },
+                  { label: "50%+", value: 50 },
+                  { label: "60%+", value: 60 },
+                ].map(f => (
+                  <button
+                    key={f.value}
+                    onClick={() => setAccumulatedFilter(f.value)}
+                    style={{
+                      padding: "5px 12px", borderRadius: 20, border: "none", cursor: "pointer",
+                      background: accumulatedFilter === f.value ? "#10b981" : "#f1f5f9",
+                      color: accumulatedFilter === f.value ? "#fff" : "#475569",
+                      fontSize: 12, fontWeight: 600,
+                    }}
+                  >
+                    {f.label}
+                    {f.value > 0 && (
+                      <span style={{ marginLeft: 4, opacity: 0.7 }}>
+                        ({accumulatedResults.filter(r => r.profitRate >= f.value).length})
+                      </span>
+                    )}
+                  </button>
+                ))}
               </div>
             </div>
+
             {accumulatedLoading && (
               <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>🔄 データを読み込み中...</div>
             )}
@@ -1622,68 +1668,103 @@ export default function App() {
                 データがありません。VPSのバッチが蓄積中です。
               </div>
             )}
+
+            {/* 商品カード一覧 */}
             {accumulatedResults
               .filter(r => r.profitRate >= accumulatedFilter)
               .map((item, i) => (
                 <div key={i} style={{
                   background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
-                  marginBottom: 10, padding: "14px 16px", boxShadow: "0 1px 3px #0000000a",
+                  marginBottom: 10, padding: isMobile ? "12px 14px" : "14px 16px",
+                  boxShadow: "0 1px 3px #0000000a",
                 }}>
-                  <div style={{
-                    display: "grid",
-                    gridTemplateColumns: isMobile ? "1fr auto" : "1fr 120px 120px 80px 180px",
-                    gap: 12, alignItems: "center",
-                  }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {item.ebayTitle}
+                  {isMobile ? (
+                    /* ── モバイルレイアウト ── */
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                        <div style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b", marginBottom: 4, lineHeight: 1.4 }}>
+                            {item.ebayTitle}
+                          </div>
+                          <Tag label={item.bestSource === "yahoo" ? "Yahoo!" : item.bestSource === "rakuten" ? "楽天" : "Amazon"} color={item.bestSource === "yahoo" ? "#720E9E" : item.bestSource === "rakuten" ? "#BF0000" : "#FF9900"} />
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{
+                            color: item.profitRate >= 50 ? "#10b981" : item.profitRate >= 30 ? "#f59e0b" : "#ef4444",
+                            fontFamily: "'DM Mono', monospace", fontSize: 22, fontWeight: 700, lineHeight: 1,
+                          }}>{item.profitRate}%</div>
+                          <div style={{ color: "#94a3b8", fontSize: 10 }}>利益率</div>
+                        </div>
                       </div>
-                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        <Tag label={item.bestSource === "yahoo" ? "Yahoo!" : item.bestSource === "rakuten" ? "楽天" : "Amazon"} color={item.bestSource === "yahoo" ? "#720E9E" : item.bestSource === "rakuten" ? "#BF0000" : "#FF9900"} />
-                        <Tag label="eBay販売" color="#E53238" />
+                      <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", marginBottom: 10 }}>
+                        <span>仕入れ <b style={{ color: "#0ea5e9" }}>¥{item.bestPrice?.toLocaleString()}</b></span>
+                        <span>販売 <b style={{ color: "#f59e0b" }}>${item.ebayPrice}</b></span>
+                        <span>利益 <b style={{ color: "#10b981" }}>¥{item.profitJpy?.toLocaleString()}</b></span>
                       </div>
-                    </div>
-                    {!isMobile && (
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <a href={item.bestUrl} target="_blank" rel="noreferrer" style={{
+                          flex: 1, background: "#720E9E", borderRadius: 8,
+                          padding: "10px 0", color: "#fff", textDecoration: "none",
+                          fontSize: 13, fontWeight: 700, textAlign: "center",
+                        }}>
+                          🛒 仕入れる
+                        </a>
+                        <a href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(item.ebayTitle.slice(0, 40))}`} target="_blank" rel="noreferrer" style={{
+                          flex: 1, background: "#E53238", borderRadius: 8,
+                          padding: "10px 0", color: "#fff", textDecoration: "none",
+                          fontSize: 13, fontWeight: 700, textAlign: "center",
+                        }}>
+                          🛍 eBay確認
+                        </a>
+                      </div>
+                    </>
+                  ) : (
+                    /* ── PCレイアウト ── */
+                    <div style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 130px 130px 80px 200px",
+                      gap: 12, alignItems: "center",
+                    }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {item.ebayTitle}
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <Tag label={item.bestSource === "yahoo" ? "Yahoo!" : item.bestSource === "rakuten" ? "楽天" : "Amazon"} color={item.bestSource === "yahoo" ? "#720E9E" : item.bestSource === "rakuten" ? "#BF0000" : "#FF9900"} />
+                          <Tag label="eBay販売" color="#E53238" />
+                        </div>
+                      </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ color: "#0ea5e9", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>¥{item.bestPrice?.toLocaleString()}</div>
                         <div style={{ color: "#94a3b8", fontSize: 11 }}>仕入れ価格</div>
                       </div>
-                    )}
-                    {!isMobile && (
                       <div style={{ textAlign: "right" }}>
                         <div style={{ color: "#f59e0b", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>${item.ebayPrice}</div>
                         <div style={{ color: "#94a3b8", fontSize: 11 }}>eBay販売価格</div>
                       </div>
-                    )}
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{
-                        color: item.profitRate >= 50 ? "#10b981" : item.profitRate >= 30 ? "#f59e0b" : "#ef4444",
-                        fontFamily: "'DM Mono', monospace", fontSize: 18, fontWeight: 700,
-                      }}>{item.profitRate}%</div>
-                      <div style={{ color: "#94a3b8", fontSize: 11 }}>利益率</div>
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <a href={item.bestUrl} target="_blank" rel="noreferrer" style={{
-                        flex: 1, background: "#720E9E11", border: "1px solid #720E9E33",
-                        borderRadius: 8, padding: "8px 10px", color: "#720E9E",
-                        textDecoration: "none", fontSize: 12, fontWeight: 600, textAlign: "center",
-                      }}>
-                        🛒 仕入れる
-                      </a>
-                      <a href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(item.ebayTitle.slice(0, 40))}`} target="_blank" rel="noreferrer" style={{
-                        flex: 1, background: "#E5323811", border: "1px solid #E5323833",
-                        borderRadius: 8, padding: "8px 10px", color: "#E53238",
-                        textDecoration: "none", fontSize: 12, fontWeight: 600, textAlign: "center",
-                      }}>
-                        🛍 eBay
-                      </a>
-                    </div>
-                  </div>
-                  {isMobile && (
-                    <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 12, color: "#64748b" }}>
-                      <span>仕入れ <b style={{ color: "#0ea5e9" }}>¥{item.bestPrice?.toLocaleString()}</b></span>
-                      <span>販売 <b style={{ color: "#f59e0b" }}>${item.ebayPrice}</b></span>
-                      <span>利益 <b style={{ color: "#10b981" }}>¥{item.profitJpy?.toLocaleString()}</b></span>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{
+                          color: item.profitRate >= 50 ? "#10b981" : item.profitRate >= 30 ? "#f59e0b" : "#ef4444",
+                          fontFamily: "'DM Mono', monospace", fontSize: 18, fontWeight: 700,
+                        }}>{item.profitRate}%</div>
+                        <div style={{ color: "#94a3b8", fontSize: 11 }}>利益率</div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <a href={item.bestUrl} target="_blank" rel="noreferrer" style={{
+                          flex: 1, background: "#720E9E", borderRadius: 8,
+                          padding: "9px 0", color: "#fff", textDecoration: "none",
+                          fontSize: 12, fontWeight: 700, textAlign: "center",
+                        }}>
+                          🛒 仕入れる
+                        </a>
+                        <a href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(item.ebayTitle.slice(0, 40))}`} target="_blank" rel="noreferrer" style={{
+                          flex: 1, background: "#E53238", borderRadius: 8,
+                          padding: "9px 0", color: "#fff", textDecoration: "none",
+                          fontSize: 12, fontWeight: 700, textAlign: "center",
+                        }}>
+                          🛍 eBay
+                        </a>
+                      </div>
                     </div>
                   )}
                 </div>
