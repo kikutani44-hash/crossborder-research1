@@ -5,6 +5,62 @@ const USD_JPY = 150;
 const EBAY_FEE_RATE = 0.129;
 const EBAY_FEE_FIXED = 0.30;
 
+// Amazon SP-API トークンキャッシュ
+let _spToken = null;
+let _spTokenExpiry = 0;
+
+async function getSpToken(clientId, clientSecret, refreshToken) {
+  if (_spToken && Date.now() < _spTokenExpiry - 60000) return _spToken;
+  const res = await fetch("https://api.amazon.com/auth/o2/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      client_id: clientId,
+      client_secret: clientSecret,
+    }),
+  });
+  const data = await res.json();
+  if (!data.access_token) throw new Error(`SP-API token error: ${JSON.stringify(data)}`);
+  _spToken = data.access_token;
+  _spTokenExpiry = Date.now() + (data.expires_in || 3600) * 1000;
+  return _spToken;
+}
+
+async function searchAmazonJp(keyword, minPrice, clientId, clientSecret, refreshToken) {
+  const token = await getSpToken(clientId, clientSecret, refreshToken);
+  const params = new URLSearchParams({
+    keywords: keyword,
+    marketplaceIds: "A1VC38T7YXB528",
+    includedData: "summaries",
+    pageSize: "5",
+  });
+  const searchRes = await fetch(
+    `https://sellingpartnerapi-fe.amazon.com/catalog/2022-04-01/items?${params}`,
+    { headers: { Authorization: `Bearer ${token}`, "x-amz-access-token": token } }
+  );
+  const searchData = await searchRes.json();
+  const items = searchData.items || [];
+  const results = [];
+  for (const ci of items.slice(0, 3)) {
+    const asin = ci.asin;
+    const title = ci.summaries?.[0]?.itemName || `ASIN ${asin}`;
+    try {
+      const priceRes = await fetch(
+        `https://sellingpartnerapi-fe.amazon.com/products/pricing/v0/price?MarketplaceId=A1VC38T7YXB528&Asins=${asin}&ItemType=Asin`,
+        { headers: { Authorization: `Bearer ${token}`, "x-amz-access-token": token } }
+      );
+      const priceData = await priceRes.json();
+      const amount = priceData.payload?.[0]?.Product?.Offers?.[0]?.BuyingPrice?.ListingPrice?.Amount;
+      if (amount && amount >= minPrice) {
+        results.push({ asin, title, price: Math.round(amount), url: `https://www.amazon.co.jp/dp/${asin}/` });
+      }
+    } catch (_) {}
+  }
+  return results.sort((a, b) => a.price - b.price);
+}
+
 function estimateShippingJpy(usd) {
   if (usd < 30) return 1200;
   if (usd < 80) return 1950;
@@ -34,10 +90,10 @@ export default async function handler(req, res) {
 
   const yahooClientId = process.env.VITE_YAHOO_CLIENT_ID;
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  const amazonAccessKey = process.env.AMAZON_ACCESS_KEY;
-  const amazonSecretKey = process.env.AMAZON_SECRET_KEY;
-  const amazonPartnerTag = process.env.AMAZON_PARTNER_TAG;
-  const hasAmazon = !!(amazonAccessKey && amazonSecretKey && amazonPartnerTag);
+  const spClientId = process.env.AMAZON_SP_API_CLIENT_ID;
+  const spClientSecret = process.env.AMAZON_SP_API_CLIENT_SECRET;
+  const spRefreshToken = process.env.AMAZON_SP_API_REFRESH_TOKEN;
+  const hasAmazon = !!(spClientId && spClientSecret && spRefreshToken);
   const rakutenAppId = process.env.RAKUTEN_APP_ID;
   const hasRakuten = !!rakutenAppId;
   const log = [];
@@ -48,7 +104,7 @@ export default async function handler(req, res) {
 
   const results = [];
 
-  for (const item of filtered.slice(0, 40)) {
+  for (const item of filtered.slice(0, 10)) {
     const ebayPriceUsd = parseFloat(item.avgPrice || 0);
 
     // Claude: eBayタイトル → Yahoo!日本語キーワード（汎用版）
@@ -117,21 +173,23 @@ export default async function handler(req, res) {
 
     // Amazon JP仕入れ価格検索
     let amazonPrice = null, amazonUrl = null, amazonName = null, amazonAsin = null;
-    if (jaKeyword && hasAmazon) {
-      try {
-        const aRes = await fetch(
-          `/api/amazon-search?keyword=${encodeURIComponent(jaKeyword)}`
-        );
-        const aData = await aRes.json();
-        const aItems = (aData.items || []).filter(ai => (ai.price || 0) >= minPrice);
-        if (aItems.length > 0) {
-          aItems.sort((a, b) => (a.price || 0) - (b.price || 0));
-          amazonPrice = aItems[0].price;
-          amazonUrl = aItems[0].url;
-          amazonName = (aItems[0].title || "").slice(0, 50);
-          amazonAsin = aItems[0].asin;
+    if (hasAmazon) {
+      const amzKeywords = [jaKeyword, jaKeywordShort, jaKeywordMin].filter(Boolean);
+      for (const kw of amzKeywords) {
+        if (amazonPrice) break;
+        try {
+          const aItems = await searchAmazonJp(kw, minPrice, spClientId, spClientSecret, spRefreshToken);
+          if (aItems.length > 0) {
+            amazonPrice = aItems[0].price;
+            amazonUrl = aItems[0].url;
+            amazonName = (aItems[0].title || "").slice(0, 50);
+            amazonAsin = aItems[0].asin;
+          }
+        } catch (e) {
+          log.push(`Amazon error: ${e.message}`);
         }
-      } catch (_) {}
+        await sleep(200);
+      }
     }
 
     // 楽天市場仕入れ価格検索（詳細 → 短縮の順でリトライ）

@@ -487,7 +487,7 @@ function saveCandidates(list) {
 
 export default function App() {
   const isMobile = useIsMobile();
-  const [activePhase, setActivePhase] = useState(1);
+  const [activePhase, setActivePhase] = useState(0);
   const [keyword, setKeyword] = useState("");
   const [ebayKeyword, setEbayKeyword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -497,11 +497,11 @@ export default function App() {
   const [log, setLog] = useState("");
   const [researchLog, setResearchLog] = useState("");
   const [ebayLog, setEbayLog] = useState("");
-  const [ebayMode, setEbayMode] = useState("seller"); // "seller" | "keyword"
+  const [ebayMode, setEbayMode] = useState("seller");
   const [sellerResults, setSellerResults] = useState([]);
   const [japanItems, setJapanItems] = useState([]);
   const [sellerLog, setSellerLog] = useState("");
-  const [sellerView, setSellerView] = useState("sellers"); // "sellers" | "japan"
+  const [sellerView, setSellerView] = useState("sellers");
   const [minProfitRate, setMinProfitRate] = useState(0);
   const [yahooAuctionKeyword, setYahooAuctionKeyword] = useState("");
   const [yahooAuctionResults, setYahooAuctionResults] = useState([]);
@@ -516,6 +516,18 @@ export default function App() {
   const [teraLoading, setTeraLoading] = useState(false);
   const [candidateList, setCandidateList] = useState(loadCandidates);
   const [showCandidates, setShowCandidates] = useState(false);
+  const [accumulatedResults, setAccumulatedResults] = useState([]);
+  const [accumulatedLoading, setAccumulatedLoading] = useState(false);
+  const [accumulatedFilter, setAccumulatedFilter] = useState(0);
+
+  useEffect(() => {
+    setAccumulatedLoading(true);
+    fetch("/api/accumulated-results")
+      .then(r => r.json())
+      .then(data => setAccumulatedResults(data.results || []))
+      .catch(() => {})
+      .finally(() => setAccumulatedLoading(false));
+  }, []);
 
   function mergeIntoCandidates(results) {
     const current = loadCandidates();
@@ -830,6 +842,12 @@ export default function App() {
 
   const PLATFORM_GROUPS = [
     {
+      label: "利益商品",
+      platforms: [
+        { phase: 0, label: "蓄積リスト", icon: "💰", color: "#10b981", ready: true },
+      ],
+    },
+    {
       label: "仕入れ先",
       platforms: [
         { phase: 1, label: "Yahoo!", icon: "🛒", color: "#720E9E", ready: true },
@@ -951,6 +969,53 @@ export default function App() {
               background: "#ffffff", border: "1px solid #e2e8f0",
               borderRadius: 16, padding: 20, boxShadow: "0 1px 4px #0000000a",
             }}>
+              {/* Phase 0: 蓄積リスト */}
+              {activePhase === 0 && (
+                <>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a", marginBottom: 8 }}>
+                    💰 蓄積利益商品リスト
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14, lineHeight: 1.6 }}>
+                    VPSが24時間自動収集した利益商品一覧です。仕入れURLをクリックして購入し、eBayに出品してください。
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", marginBottom: 6 }}>利益率フィルター</div>
+                  <select
+                    value={accumulatedFilter}
+                    onChange={e => setAccumulatedFilter(Number(e.target.value))}
+                    style={{ width: "100%", padding: "8px 10px", borderRadius: 8, fontSize: 12, border: "1px solid #e2e8f0", marginBottom: 12 }}
+                  >
+                    <option value={0}>全て表示</option>
+                    <option value={30}>30%以上</option>
+                    <option value={40}>40%以上</option>
+                    <option value={50}>50%以上</option>
+                    <option value={60}>60%以上</option>
+                  </select>
+                  <button
+                    onClick={() => {
+                      setAccumulatedLoading(true);
+                      fetch("/api/accumulated-results")
+                        .then(r => r.json())
+                        .then(data => setAccumulatedResults(data.results || []))
+                        .catch(() => {})
+                        .finally(() => setAccumulatedLoading(false));
+                    }}
+                    style={{
+                      width: "100%", padding: "10px 0",
+                      background: "linear-gradient(135deg, #10b981, #0d9488)",
+                      border: "none", borderRadius: 8, color: "#fff", fontWeight: 700,
+                      cursor: "pointer", fontSize: 13,
+                    }}
+                  >
+                    {accumulatedLoading ? "🔄 更新中..." : "🔄 最新データを取得"}
+                  </button>
+                  <div style={{ marginTop: 12, background: "#f0fdf4", borderRadius: 8, padding: "10px 12px", fontSize: 11, color: "#065f46" }}>
+                    <div>📊 累計: {accumulatedResults.length}件</div>
+                    <div>✅ {accumulatedFilter}%以上: {accumulatedResults.filter(r => r.profitRate >= accumulatedFilter).length}件</div>
+                    <div style={{ marginTop: 4, color: "#94a3b8" }}>30分ごと自動更新中</div>
+                  </div>
+                </>
+              )}
+
               {/* Phase 1: Yahoo仕入れ */}
               {activePhase === 1 && (
                 <>
@@ -1535,6 +1600,97 @@ export default function App() {
           {/* RIGHT CONTENT */}
           <div style={{ flex: 1, minWidth: 0, width: isMobile ? "100%" : undefined }}>
 
+        {/* PHASE 0: 蓄積利益商品リスト */}
+        {activePhase === 0 && (
+          <>
+            <div style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a" }}>
+                💰 利益商品リスト
+                <span style={{ marginLeft: 10, fontSize: 12, color: "#94a3b8", fontWeight: 400 }}>
+                  VPSが自動収集・30分毎更新
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>
+                {accumulatedResults.filter(r => r.profitRate >= accumulatedFilter).length}件表示
+              </div>
+            </div>
+            {accumulatedLoading && (
+              <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>🔄 データを読み込み中...</div>
+            )}
+            {!accumulatedLoading && accumulatedResults.length === 0 && (
+              <div style={{ textAlign: "center", padding: 40, color: "#94a3b8" }}>
+                データがありません。VPSのバッチが蓄積中です。
+              </div>
+            )}
+            {accumulatedResults
+              .filter(r => r.profitRate >= accumulatedFilter)
+              .map((item, i) => (
+                <div key={i} style={{
+                  background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
+                  marginBottom: 10, padding: "14px 16px", boxShadow: "0 1px 3px #0000000a",
+                }}>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile ? "1fr auto" : "1fr 120px 120px 80px 180px",
+                    gap: 12, alignItems: "center",
+                  }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: "#1e293b", marginBottom: 4, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.ebayTitle}
+                      </div>
+                      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <Tag label={item.bestSource === "yahoo" ? "Yahoo!" : item.bestSource === "rakuten" ? "楽天" : "Amazon"} color={item.bestSource === "yahoo" ? "#720E9E" : item.bestSource === "rakuten" ? "#BF0000" : "#FF9900"} />
+                        <Tag label="eBay販売" color="#E53238" />
+                      </div>
+                    </div>
+                    {!isMobile && (
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ color: "#0ea5e9", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>¥{item.bestPrice?.toLocaleString()}</div>
+                        <div style={{ color: "#94a3b8", fontSize: 11 }}>仕入れ価格</div>
+                      </div>
+                    )}
+                    {!isMobile && (
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ color: "#f59e0b", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>${item.ebayPrice}</div>
+                        <div style={{ color: "#94a3b8", fontSize: 11 }}>eBay販売価格</div>
+                      </div>
+                    )}
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{
+                        color: item.profitRate >= 50 ? "#10b981" : item.profitRate >= 30 ? "#f59e0b" : "#ef4444",
+                        fontFamily: "'DM Mono', monospace", fontSize: 18, fontWeight: 700,
+                      }}>{item.profitRate}%</div>
+                      <div style={{ color: "#94a3b8", fontSize: 11 }}>利益率</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <a href={item.bestUrl} target="_blank" rel="noreferrer" style={{
+                        flex: 1, background: "#720E9E11", border: "1px solid #720E9E33",
+                        borderRadius: 8, padding: "8px 10px", color: "#720E9E",
+                        textDecoration: "none", fontSize: 12, fontWeight: 600, textAlign: "center",
+                      }}>
+                        🛒 仕入れる
+                      </a>
+                      <a href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(item.ebayTitle.slice(0, 40))}`} target="_blank" rel="noreferrer" style={{
+                        flex: 1, background: "#E5323811", border: "1px solid #E5323833",
+                        borderRadius: 8, padding: "8px 10px", color: "#E53238",
+                        textDecoration: "none", fontSize: 12, fontWeight: 600, textAlign: "center",
+                      }}>
+                        🛍 eBay
+                      </a>
+                    </div>
+                  </div>
+                  {isMobile && (
+                    <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 12, color: "#64748b" }}>
+                      <span>仕入れ <b style={{ color: "#0ea5e9" }}>¥{item.bestPrice?.toLocaleString()}</b></span>
+                      <span>販売 <b style={{ color: "#f59e0b" }}>${item.ebayPrice}</b></span>
+                      <span>利益 <b style={{ color: "#10b981" }}>¥{item.profitJpy?.toLocaleString()}</b></span>
+                    </div>
+                  )}
+                </div>
+              ))}
+          </>
+        )}
+
         {/* PHASE 1: Yahoo仕入れリサーチ */}
         {activePhase === 1 && (
           <>
@@ -2050,38 +2206,39 @@ export default function App() {
                           </div>
                           {hasSourcing && (
                             <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
-                              {item.bestSource === "yahoo" && item.yahooUrl && (
+                              {item.yahooUrl && (
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ background: "#720E9E", color: "#fff", fontSize: 10, padding: "1px 6px", borderRadius: 3, fontWeight: 700 }}>Yahoo!</span>
-                                  <a href={item.yahooUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0369a1" }}>
-                                    ¥{item.bestPrice?.toLocaleString()} — {item.yahooName}
+                                  <span style={{ background: item.bestSource === "yahoo" ? "#720E9E" : "#a78bca", color: "#fff", fontSize: 10, padding: "1px 6px", borderRadius: 3, fontWeight: 700 }}>
+                                    Yahoo!{item.bestSource === "yahoo" ? " ★最安" : ""}
+                                  </span>
+                                  <a href={item.yahooUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0369a1", fontWeight: item.bestSource === "yahoo" ? 700 : 400 }}>
+                                    ¥{item.yahooPrice?.toLocaleString()} — {item.yahooName}
                                   </a>
                                   <button onClick={() => navigator.clipboard.writeText(item.yahooUrl)} style={{ fontSize: 10, padding: "1px 6px", border: "1px solid #e2e8f0", borderRadius: 4, background: "#f8fafc", cursor: "pointer", color: "#64748b" }}>URLコピー</button>
                                 </div>
                               )}
-                              {item.bestSource === "amazon" && item.amazonUrl && (
+                              {item.amazonUrl && (
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ background: "#FF9900", color: "#fff", fontSize: 10, padding: "1px 6px", borderRadius: 3, fontWeight: 700 }}>Amazon</span>
-                                  <a href={item.amazonUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0369a1" }}>
-                                    ¥{item.bestPrice?.toLocaleString()} — {item.amazonName}
+                                  <span style={{ background: item.bestSource === "amazon" ? "#FF9900" : "#ffc966", color: "#fff", fontSize: 10, padding: "1px 6px", borderRadius: 3, fontWeight: 700 }}>
+                                    Amazon{item.bestSource === "amazon" ? " ★最安" : ""}
+                                  </span>
+                                  <a href={item.amazonUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0369a1", fontWeight: item.bestSource === "amazon" ? 700 : 400 }}>
+                                    ¥{item.amazonPrice?.toLocaleString()} — {item.amazonName}
                                   </a>
                                   {item.amazonAsin && (
-                                    <button onClick={() => navigator.clipboard.writeText(item.amazonAsin)} style={{ fontSize: 10, padding: "1px 6px", border: "1px solid #fed7aa", borderRadius: 4, background: "#fff7ed", cursor: "pointer", color: "#92400e", fontWeight: 700 }}>ASIN: {item.amazonAsin}</button>
+                                    <button onClick={() => navigator.clipboard.writeText(item.amazonAsin)} style={{ fontSize: 10, padding: "1px 6px", border: "1px solid #fed7aa", borderRadius: 4, background: "#fff7ed", cursor: "pointer", color: "#92400e" }}>ASIN: {item.amazonAsin}</button>
                                   )}
                                 </div>
                               )}
-                              {item.bestSource === "rakuten" && item.rakutenUrl && (
+                              {item.rakutenUrl && (
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                  <span style={{ background: "#BF0000", color: "#fff", fontSize: 10, padding: "1px 6px", borderRadius: 3, fontWeight: 700 }}>楽天</span>
-                                  <a href={item.rakutenUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0369a1" }}>
-                                    ¥{item.bestPrice?.toLocaleString()} — {item.rakutenName}
+                                  <span style={{ background: item.bestSource === "rakuten" ? "#BF0000" : "#e87070", color: "#fff", fontSize: 10, padding: "1px 6px", borderRadius: 3, fontWeight: 700 }}>
+                                    楽天{item.bestSource === "rakuten" ? " ★最安" : ""}
+                                  </span>
+                                  <a href={item.rakutenUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: "#0369a1", fontWeight: item.bestSource === "rakuten" ? 700 : 400 }}>
+                                    ¥{item.rakutenPrice?.toLocaleString()} — {item.rakutenName}
                                   </a>
                                   <button onClick={() => navigator.clipboard.writeText(item.rakutenUrl)} style={{ fontSize: 10, padding: "1px 6px", border: "1px solid #fca5a5", borderRadius: 4, background: "#fff5f5", cursor: "pointer", color: "#BF0000" }}>URLコピー</button>
-                                </div>
-                              )}
-                              {item.yahooPrice && item.amazonPrice && (
-                                <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                                  Yahoo! ¥{item.yahooPrice?.toLocaleString()} / Amazon ¥{item.amazonPrice?.toLocaleString()} → 最安を選択
                                 </div>
                               )}
                             </div>
