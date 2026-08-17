@@ -9,6 +9,7 @@
     "api/auto-scan.js": { "maxDuration": 300 },
     "api/ebay-sold.js": { "maxDuration": 300 },
     "api/research.js": { "maxDuration": 300 },
-    "api/seller-research.js": { "maxDuration": 300 }
+    "api/seller-research.js": { "maxDuration": 300 },
+    "api/accumulated-results.js": { "maxDuration": 30 }
   }
 }
