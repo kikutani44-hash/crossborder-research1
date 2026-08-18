@@ -1713,10 +1713,10 @@ export default function App() {
                           <div style={{ color: "#94a3b8", fontSize: 10 }}>利益率</div>
                         </div>
                       </div>
-                      <div style={{ display: "flex", gap: 12, fontSize: 12, color: "#64748b", marginBottom: 10 }}>
+                      <div style={{ display: "flex", gap: 10, fontSize: 12, color: "#64748b", marginBottom: 10, flexWrap: "wrap" }}>
                         <span>仕入れ <b style={{ color: "#0ea5e9" }}>¥{item.bestPrice?.toLocaleString()}</b></span>
-                        <span>販売 <b style={{ color: "#f59e0b" }}>${item.ebayPrice}</b></span>
-                        <span>利益 <b style={{ color: "#10b981" }}>¥{item.profitJpy?.toLocaleString()}</b></span>
+                        <span>販売 <b style={{ color: "#f59e0b" }}>${item.ebayPrice}</b> <span style={{ color: "#94a3b8" }}>(≈¥{Math.round(item.ebayPrice * 150).toLocaleString()})</span></span>
+                        <span>利益 <b style={{ color: "#10b981", fontSize: 13 }}>¥{item.profitJpy?.toLocaleString()}</b></span>
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
                         <a href={item.bestUrl} target="_blank" rel="noreferrer" style={{
@@ -1757,14 +1757,14 @@ export default function App() {
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ color: "#f59e0b", fontFamily: "'DM Mono', monospace", fontSize: 13 }}>${item.ebayPrice}</div>
-                        <div style={{ color: "#94a3b8", fontSize: 11 }}>eBay販売価格</div>
+                        <div style={{ color: "#94a3b8", fontSize: 11 }}>≈¥{Math.round(item.ebayPrice * 150).toLocaleString()}</div>
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{
                           color: item.profitRate >= 50 ? "#10b981" : item.profitRate >= 30 ? "#f59e0b" : "#ef4444",
-                          fontFamily: "'DM Mono', monospace", fontSize: 18, fontWeight: 700,
+                          fontFamily: "'DM Mono', monospace", fontSize: 16, fontWeight: 700,
                         }}>{item.profitRate}%</div>
-                        <div style={{ color: "#94a3b8", fontSize: 11 }}>利益率</div>
+                        <div style={{ color: "#10b981", fontFamily: "'DM Mono', monospace", fontSize: 12, fontWeight: 600 }}>¥{item.profitJpy?.toLocaleString()}</div>
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
                         <a href={item.bestUrl} target="_blank" rel="noreferrer" style={{
