@@ -889,10 +889,7 @@ export default function App() {
         background: "#ffffff", boxShadow: "0 1px 3px #0000000a",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{
-            width: 32, height: 32, background: "linear-gradient(135deg, #0ea5e9, #6366f1)",
-            borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
-          }}>🌐</div>
+          <img src="/logo.png" alt="logo" style={{ width: 36, height: 36, borderRadius: 8 }} />
           <div>
             <div style={{ fontWeight: 800, fontSize: 15, letterSpacing: 0.5, color: "#0f172a" }}>CrossBorder Research</div>
             <div style={{ color: "#94a3b8", fontSize: 10, fontFamily: "'DM Mono', monospace", letterSpacing: 1 }}>
