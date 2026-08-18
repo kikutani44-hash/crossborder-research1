@@ -519,6 +519,18 @@ export default function App() {
   const [accumulatedResults, setAccumulatedResults] = useState([]);
   const [accumulatedLoading, setAccumulatedLoading] = useState(false);
   const [accumulatedFilter, setAccumulatedFilter] = useState(0);
+  const [hiddenItems, setHiddenItems] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("hidden_accumulated") || "[]")); } catch { return new Set(); }
+  });
+
+  function hideItem(key) {
+    setHiddenItems(prev => {
+      const next = new Set(prev);
+      next.add(key);
+      localStorage.setItem("hidden_accumulated", JSON.stringify([...next]));
+      return next;
+    });
+  }
 
   useEffect(() => {
     setAccumulatedLoading(true);
@@ -1669,12 +1681,20 @@ export default function App() {
             {/* 商品カード一覧 */}
             {accumulatedResults
               .filter(r => r.profitRate >= accumulatedFilter)
-              .map((item, i) => (
+              .filter(r => !hiddenItems.has(r.ebayTitle?.slice(0, 70)))
+              .map((item, i) => {
+                const itemKey = item.ebayTitle?.slice(0, 70);
+                return (
                 <div key={i} style={{
                   background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
                   marginBottom: 10, padding: isMobile ? "12px 14px" : "14px 16px",
-                  boxShadow: "0 1px 3px #0000000a",
+                  boxShadow: "0 1px 3px #0000000a", position: "relative",
                 }}>
+                  <button onClick={() => hideItem(itemKey)} title="このリストから削除" style={{
+                    position: "absolute", top: 8, right: 8,
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "#cbd5e1", fontSize: 16, lineHeight: 1, padding: 4, borderRadius: 4,
+                  }}>✕</button>
                   {isMobile ? (
                     /* ── モバイルレイアウト ── */
                     <>
@@ -1765,7 +1785,8 @@ export default function App() {
                     </div>
                   )}
                 </div>
-              ))}
+              );
+              })}
           </>
         )}
 
