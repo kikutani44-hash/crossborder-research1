@@ -1704,6 +1704,8 @@ export default function App() {
                             {item.ebayTitle}
                           </div>
                           <Tag label={item.bestSource === "yahoo" ? "Yahoo!" : item.bestSource === "rakuten" ? "楽天" : "Amazon"} color={item.bestSource === "yahoo" ? "#720E9E" : item.bestSource === "rakuten" ? "#BF0000" : "#FF9900"} />
+                          {item.soldCount90d > 0 && <Tag label={`落札${item.soldCount90d}件`} color="#059669" />}
+                          {item.soldCount90d === 0 && <Tag label="落札実績なし" color="#94a3b8" />}
                         </div>
                         <div style={{ textAlign: "right", flexShrink: 0 }}>
                           <div style={{
@@ -1748,7 +1750,8 @@ export default function App() {
                         </div>
                         <div style={{ display: "flex", gap: 6 }}>
                           <Tag label={item.bestSource === "yahoo" ? "Yahoo!" : item.bestSource === "rakuten" ? "楽天" : "Amazon"} color={item.bestSource === "yahoo" ? "#720E9E" : item.bestSource === "rakuten" ? "#BF0000" : "#FF9900"} />
-                          <Tag label="eBay販売" color="#E53238" />
+                          {item.soldCount90d > 0 && <Tag label={`落札${item.soldCount90d}件`} color="#059669" />}
+                          {item.soldCount90d === 0 && <Tag label="実績なし" color="#94a3b8" />}
                         </div>
                       </div>
                       <div style={{ textAlign: "right" }}>
