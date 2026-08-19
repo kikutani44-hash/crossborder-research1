@@ -1735,7 +1735,7 @@ export default function App() {
                         }}>
                           🛒 仕入れる
                         </a>
-                        <a href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(item.ebayTitle.slice(0, 40))}`} target="_blank" rel="noreferrer" style={{
+                        <a href={item.ebayItemUrl || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(item.ebayTitle.slice(0, 40))}`} target="_blank" rel="noreferrer" style={{
                           flex: 1, background: "#E53238", borderRadius: 8,
                           padding: "10px 0", color: "#fff", textDecoration: "none",
                           fontSize: 13, fontWeight: 700, textAlign: "center",
@@ -1794,7 +1794,7 @@ export default function App() {
                         }}>
                           🛒 仕入れる
                         </a>
-                        <a href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(item.ebayTitle.slice(0, 40))}`} target="_blank" rel="noreferrer" style={{
+                        <a href={item.ebayItemUrl || `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(item.ebayTitle.slice(0, 40))}`} target="_blank" rel="noreferrer" style={{
                           flex: 1, background: "#E53238", borderRadius: 8,
                           padding: "9px 0", color: "#fff", textDecoration: "none",
                           fontSize: 12, fontWeight: 700, textAlign: "center",
