@@ -5,6 +5,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // 開発時だけVPSのAPIを直接叩く。本番はVercelの api/accumulated-results.js が中継する。
+      "/api/accumulated-results": {
+        target: "http://163.44.112.38:3001",
+        changeOrigin: true,
+        rewrite: () => "/results",
+      },
       "/api/rakuten": {
         target: "https://app.rakuten.co.jp",
         changeOrigin: true,

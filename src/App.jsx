@@ -1695,6 +1695,76 @@ export default function App() {
                     background: "none", border: "none", cursor: "pointer",
                     color: "#cbd5e1", fontSize: 16, lineHeight: 1, padding: 4, borderRadius: 4,
                   }}>✕</button>
+
+                  {/* eBayと仕入れ元の画像を並べる。文字だけでは「似ているが別シリーズ」を
+                      見抜けないため、目視で一瞬に確認できるようにしている。 */}
+                  {(item.ebayImage || item.sourceImage) && (
+                    <div style={{ display: "flex", gap: 8, marginBottom: 10, alignItems: "stretch" }}>
+                      {[
+                        { src: item.ebayImage, label: "eBay（売れている商品）", color: "#E53238" },
+                        { src: item.sourceImage, label: "日本（仕入れる商品）", color: "#720E9E" },
+                      ].map((im, k) => (
+                        <div key={k} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
+                          <div style={{
+                            width: "100%", aspectRatio: "1", background: "#f8fafc",
+                            border: "1px solid #e2e8f0", borderRadius: 8, overflow: "hidden",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            {im.src
+                              ? <img src={im.src} alt={im.label} loading="lazy"
+                                     style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+                              : <span style={{ color: "#cbd5e1", fontSize: 11 }}>画像なし</span>}
+                          </div>
+                          <div style={{ fontSize: 10, color: im.color, marginTop: 3, fontWeight: 600 }}>
+                            {im.label}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 同定方法と実売数。この2つが「出して良い商品か」の判断材料になる。 */}
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+                    {item.matchTier && (
+                      <Tag
+                        label={
+                          item.matchTier === "JAN" ? "JANコード一致（確実）"
+                          : item.matchTier === "画像" ? `画像で確認（${Math.round((item.matchConfidence || 0) * 100)}%）`
+                          : `${item.matchTier} 一致`
+                        }
+                        color={item.matchTier === "JAN" ? "#059669" : item.matchTier === "画像" ? "#7c3aed" : "#0284c7"}
+                      />
+                    )}
+                    {item.soldCount > 0 && <Tag label={`eBay実売 ${item.soldCount}個`} color="#dc2626" />}
+                    {item.channel === "shopee" && <Tag label="Shopee向き" color="#ee4d2d" />}
+                    {item.channel === "both" && <Tag label="eBay・Shopee両方" color="#0f766e" />}
+                    {item.packQty > 1 && <Tag label={`${item.packQty}個で換算`} color="#b45309" />}
+                  </div>
+
+                  {/* 販路ごとの利益。送料が違うので、低単価商品はShopeeでしか黒字にならない。 */}
+                  {(item.ebayProfitJpy !== undefined) && (
+                    <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                      {[
+                        { name: "eBay", jpy: item.ebayProfitJpy, rate: item.ebayProfitRate, note: "送料約3,000円" },
+                        { name: "Shopee", jpy: item.shopeeProfitJpy, rate: item.shopeeProfitRate, note: "送料約1,200円" },
+                      ].map((ch, k) => (
+                        <div key={k} style={{
+                          flex: 1, borderRadius: 8, padding: "6px 8px",
+                          background: ch.jpy > 0 ? "#f0fdf4" : "#fef2f2",
+                          border: `1px solid ${ch.jpy > 0 ? "#bbf7d0" : "#fecaca"}`,
+                        }}>
+                          <div style={{ fontSize: 10, color: "#64748b" }}>{ch.name}<span style={{ marginLeft: 4, color: "#cbd5e1" }}>{ch.note}</span></div>
+                          <div style={{
+                            fontFamily: "'DM Mono', monospace", fontSize: 14, fontWeight: 700,
+                            color: ch.jpy > 0 ? "#059669" : "#dc2626",
+                          }}>
+                            ¥{ch.jpy?.toLocaleString()} <span style={{ fontSize: 11 }}>({ch.rate}%)</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
                   {isMobile ? (
                     /* ── モバイルレイアウト ── */
                     <>

@@ -3,7 +3,7 @@
   "configurations": [
     {
       "name": "crossborder-research",
-      "cwd": "crossborder-research1",
+      "cwd": ".",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "5173"],
       "port": 5173
