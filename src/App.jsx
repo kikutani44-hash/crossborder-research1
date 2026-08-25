@@ -1735,7 +1735,14 @@ export default function App() {
                         color={item.matchTier === "JAN" ? "#059669" : item.matchTier === "画像" ? "#7c3aed" : "#0284c7"}
                       />
                     )}
-                    {item.soldCount > 0 && <Tag label={`eBay実売 ${item.soldCount}個`} color="#dc2626" />}
+                    {/* 累計より「月あたり何個売れているか」が回転の速さを表す。
+                        累計663個でも3年前からの出品なら月111個、25日で444個なら月533個。 */}
+                    {item.soldPerMonth > 0 && (
+                      <Tag label={`月 ${item.soldPerMonth}個ペース`} color="#dc2626" />
+                    )}
+                    {item.soldCount > 0 && (
+                      <Tag label={`累計${item.soldCount}個${item.listedDays ? ` / ${item.listedDays}日` : ""}`} color="#94a3b8" />
+                    )}
                     {item.channel === "shopee" && <Tag label="Shopee向き" color="#ee4d2d" />}
                     {item.channel === "both" && <Tag label="eBay・Shopee両方" color="#0f766e" />}
                     {item.packQty > 1 && <Tag label={`${item.packQty}個で換算`} color="#b45309" />}
